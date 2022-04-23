@@ -1,11 +1,17 @@
 /// <reference path="../../node_modules/babylonjs/babylon.d.ts" />
 
+/**
+ * @returns {Promise<void>}
+ */
 async function main() {
   const canvas = document.getElementById('root');
   
   const engine = new BABYLON.WebGPUEngine(canvas, { preserveDrawingBuffer: true, stencil: true });
   await engine.initAsync();
 
+  /**
+   * @returns {BABYLON.Scene}
+   */
   function createScene(){
     const scene = new BABYLON.Scene(engine);
     scene.clearColor = new BABYLON.Color4(.1, .1, .1, 1);
@@ -34,6 +40,12 @@ async function main() {
       y: { max: 10, min: -10 },
     }
 
+    /**
+     * @param {BABYLON.Color3} one 
+     * @param {BABYLON.Color3} other 
+     * @param {number} t 
+     * @returns 
+     */
     function mixColor(one, other, t) {
       const lerp = (a, b, t) => a * (1 - t) + b * t;
       return new BABYLON.Color3(
@@ -43,6 +55,11 @@ async function main() {
       );
     }
 
+    /**
+     * @param {BABYLON.Vector3} position
+     * @param {{ x: { max: number, min: number }, y: { max: number, min: number } }} boundary 
+     * @returns {BABYLON.Vector3}
+     */
     function sanitizePosition(position, boundary) {
       if (position.x > boundary.x.max) { position.x += boundary.x.min - boundary.x.max; }
       if (position.x < boundary.x.min) { position.x += boundary.x.max - boundary.x.min; }
