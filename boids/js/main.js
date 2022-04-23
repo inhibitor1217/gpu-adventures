@@ -8,13 +8,34 @@ async function main() {
 
   function createScene(){
     const scene = new BABYLON.Scene(engine);
-    const camera = new BABYLON.FreeCamera('camera1', new BABYLON.Vector3(0, 5, -10), scene);
-    camera.setTarget(BABYLON.Vector3.Zero());
-    camera.attachControl(canvas, false);
-    const light = new BABYLON.HemisphericLight('light1', new BABYLON.Vector3(0, 1, 0), scene);
-    const sphere = BABYLON.MeshBuilder.CreateSphere('sphere1', {segments: 16, diameter: 2, sideOrientation: BABYLON.Mesh.FRONTSIDE}, scene);
-    sphere.position.y = 1;
-    const ground = BABYLON.MeshBuilder.CreateGround("ground1", { width: 6, height: 6, subdivisions: 2, updatable: false }, scene);
+    const axesViewer = new BABYLON.AxesViewer(scene);
+
+    const camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 20, BABYLON.Vector3.Zero(), scene);
+
+    const light = new BABYLON.HemisphericLight("Light", new BABYLON.Vector3(0, 1, 0), scene);
+
+    const triangle = BABYLON.MeshBuilder.CreateDisc('Triangle', { tessellation: 3 }, scene);
+  
+    const SPS = new BABYLON.SolidParticleSystem('BoidSPS', scene);
+    SPS.addShape(triangle, 64);
+
+    triangle.dispose();
+
+    const mesh = SPS.buildMesh();
+
+    SPS.initParticles = () => {
+      for (let i = 0; i < SPS.nbParticles; i++) {
+        const particle = SPS.particles[i];
+
+        particle.position.x = BABYLON.Scalar.RandomRange(-10, 10)
+        particle.position.y = BABYLON.Scalar.RandomRange(-5, 5);
+        particle.position.z = 0;
+      }
+    }
+
+    SPS.initParticles();
+    SPS.setParticles();
+
     return scene;
   }
 
