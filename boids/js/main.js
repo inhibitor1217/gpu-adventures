@@ -8,6 +8,7 @@ async function main() {
 
   function createScene(){
     const scene = new BABYLON.Scene(engine);
+    scene.clearColor = new BABYLON.Color4(.1, .1, .1, 1);
     const axesViewer = new BABYLON.AxesViewer(scene);
 
     const camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 20, BABYLON.Vector3.Zero(), scene);
@@ -23,18 +24,67 @@ async function main() {
 
     const mesh = SPS.buildMesh();
 
+    const colors = {
+      light: new BABYLON.Color3(.43, .78, 1),
+      dark: new BABYLON.Color3(0, .41, .75),
+    };
+    const speed = 5.0;
+    const worldBoundary = {
+      x: { max: 15, min: -15 },
+      y: { max: 10, min: -10 },
+    }
+
+    function mixColor(one, other, t) {
+      const lerp = (a, b, t) => a * (1 - t) + b * t;
+      return new BABYLON.Color3(
+        lerp(one.r, other.r, t),
+        lerp(one.g, other.g, t),
+        lerp(one.b, other.b, t),
+      );
+    }
+
+    function sanitizePosition(position, boundary) {
+      if (position.x > boundary.x.max) { position.x += boundary.x.min - boundary.x.max; }
+      if (position.x < boundary.x.min) { position.x += boundary.x.max - boundary.x.min; }
+      if (position.y > boundary.y.max) { position.y += boundary.y.min - boundary.y.max; }
+      if (position.y < boundary.y.min) { position.y += boundary.y.max - boundary.y.min; }
+      return position;
+    }
+
     SPS.initParticles = () => {
       for (let i = 0; i < SPS.nbParticles; i++) {
         const particle = SPS.particles[i];
 
-        particle.position.x = BABYLON.Scalar.RandomRange(-10, 10)
-        particle.position.y = BABYLON.Scalar.RandomRange(-5, 5);
+        particle.position.x = BABYLON.Scalar.RandomRange(worldBoundary.x.min, worldBoundary.x.max);
+        particle.position.y = BABYLON.Scalar.RandomRange(worldBoundary.y.min, worldBoundary.y.max);
         particle.position.z = 0;
+
+        const angle = BABYLON.Scalar.RandomRange(-Math.PI, +Math.PI);
+        const velocity = new BABYLON.Vector3(Math.cos(angle), Math.sin(angle), 0).scale(speed);
+
+        particle.rotation.z = angle;
+
+        particle.props = { velocity };
+
+        particle.scale = new BABYLON.Vector3(1, .5, 1);
+
+        particle.color = mixColor(colors.light, colors.dark, BABYLON.Scalar.RandomRange(0, 1));
       }
+    }
+
+    SPS.updateParticle = particle => {
+      const dt = engine.getDeltaTime();
+
+      particle.position.addInPlace(particle.props.velocity.scale(dt * .001));
+      sanitizePosition(particle.position, worldBoundary);
     }
 
     SPS.initParticles();
     SPS.setParticles();
+
+    scene.onBeforeRenderObservable.add(() => {
+      SPS.setParticles();
+    })
 
     return scene;
   }
