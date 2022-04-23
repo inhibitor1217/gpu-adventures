@@ -1,3 +1,5 @@
+/// <reference path="../../node_modules/babylonjs/babylon.d.ts" />
+
 function main() {
   const canvas = document.getElementById('root');
   
