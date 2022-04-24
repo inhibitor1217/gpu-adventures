@@ -1,5 +1,7 @@
 # 2D Boids
 
+> ### Watch the [Simulation](https://inhibitor1217.github.io/gpu-adventures/boids/) 🚀
+
 Inspired by [Sebastian Lague](https://github.com/SebLague/Boids/tree/master)'s [Coding Adventure - Boids](https://www.youtube.com/watch?v=bqtqltqcQhw).
 
 This is an WebGL (can switch to WebGPU, though) / BabylonJS implementation of 2D Boids.
