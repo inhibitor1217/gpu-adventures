@@ -23,6 +23,11 @@ async function main() {
       targetIndex: 0,
       size: 250,
       physics: {
+        collision: {
+          detectDistance: 5,
+          nQuery: 12,
+          queryStep: .05 * Math.PI,
+        },
         speed: {
           initial: 6.0,
           max: 8.0,
@@ -128,6 +133,16 @@ async function main() {
   }
 
   /**
+   * @param {BABYLON.SolidParticle} particle 
+   * @param {BABYLON.Scene} scene
+   * @returns {boolean}
+   */
+  function isColliding(particle, scene) {
+    const ray = new BABYLON.Ray(particle.position, particle.props.velocity.clone().normalize(), SETTINGS.particle.physics.collision.detectDistance);
+    return scene.pickWithRay(ray).hit;
+  }
+
+  /**
    * @returns {BABYLON.Scene}
    */
   function createScene(){
@@ -156,11 +171,35 @@ async function main() {
       
       const mesh = BABYLON.MeshBuilder.CreateRibbon('Arc', options, scene);
 
+      mesh.scaling = BABYLON.Vector3.One().scaleInPlace(SETTINGS.particle.viewRange.distance);
+
       mesh.material = new BABYLON.StandardMaterial('ArcMesh', scene);
       mesh.material.diffuseColor = new BABYLON.Color3(1, 1, 1);
       mesh.material.alpha = .1;
 
       return mesh;
+    }
+
+    function CreateWorldBoundingBox() {
+      const mesh = BABYLON.MeshBuilder.CreateBox(
+        'WorldBoundingBox',
+        {
+          width: SETTINGS.world.boundary.x.max - SETTINGS.world.boundary.x.min,
+          height: SETTINGS.world.boundary.y.max - SETTINGS.world.boundary.y.min,
+        },
+        scene,
+      );
+
+      mesh.position = BABYLON.Vector3.Zero();
+
+      mesh.material = new BABYLON.StandardMaterial('WorldBoundingBoxMat', scene);
+      mesh.material.wireframe = true;
+
+      return mesh;
+    }
+
+    function CreateCollisionVizMesh() {
+      return BABYLON.MeshBuilder.CreateLineSystem('TargetCollisionViz', { lines: [], updatable: true }, scene);
     }
 
     const camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 80, BABYLON.Vector3.Zero(), scene);
@@ -226,7 +265,6 @@ async function main() {
         }
       }
 
-
       const force = BABYLON.Vector3.Zero();
       
       force.addInPlace(repulsionForce.scale(SETTINGS.particle.physics.force.repulsion.weight));
@@ -262,7 +300,15 @@ async function main() {
     SPS.initParticles();
     SPS.setParticles();
 
+    const worldBoundingBox = CreateWorldBoundingBox();
+
+    const target = new BABYLON.Mesh('Target', scene);
+
     const viewingAreaMesh = CreateArcMesh(SETTINGS.particle.viewRange.angle);
+    viewingAreaMesh.setParent(target);
+
+    const targetCollisionViz = CreateCollisionVizMesh();
+    targetCollisionViz.setParent(target);
 
     scene.onBeforeRenderObservable.add(() => {
       function markVisibleParticles() {
@@ -276,14 +322,13 @@ async function main() {
         }
       }
 
-      function updateViewingAreaMesh() {
-        viewingAreaMesh.position.copyFrom(SPS.particles[SETTINGS.particle.targetIndex].position);
-        viewingAreaMesh.rotation.copyFrom(SPS.particles[SETTINGS.particle.targetIndex].rotation);
-        viewingAreaMesh.scaling.copyFromFloats(SETTINGS.particle.viewRange.distance, SETTINGS.particle.viewRange.distance, SETTINGS.particle.viewRange.distance);
+      function updateTargetMesh() {
+        target.position.copyFrom(SPS.particles[SETTINGS.particle.targetIndex].position);
+        target.rotation.copyFrom(SPS.particles[SETTINGS.particle.targetIndex].rotation);
       }
 
       markVisibleParticles();
-      updateViewingAreaMesh();
+      updateTargetMesh();
 
       SPS.setParticles();
     });
