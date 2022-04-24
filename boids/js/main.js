@@ -36,6 +36,9 @@ async function main() {
             weight: 50,
             detectDistance: 5,
           },
+          align: {
+            weight: 10,
+          },
           min: 0.0,
           max: 20.0,
         },
@@ -204,13 +207,33 @@ async function main() {
 
       const repulsionForce = BABYLON.Vector3.Zero();
 
+      let flockSize = 0;
+      const avgFlockDirection = BABYLON.Vector3.Zero();
+
       for (let i = 0; i < SPS.nbParticles; i++) {
         if (i === particle.idx) { continue; }
+
         repulsionForce.addInPlace(RepulsionForce(particle, SPS.particles[i]));
+
+        if (isVisibleParticle(particle, SPS.particles[i])) {
+          flockSize += 1;
+          avgFlockDirection.addInPlace(SPS.particles[i].props.velocity.clone().normalize());
+        }
       }
 
+
       const force = BABYLON.Vector3.Zero();
+      
       force.addInPlace(repulsionForce.scale(SETTINGS.particle.physics.force.repulsion.weight));
+
+      if (flockSize > 0) {
+        const steerDirection = avgFlockDirection
+          .normalize()
+          .subtract(particle.props.velocity.clone().normalize())
+          .normalize();
+
+        force.addInPlace(steerDirection.scale(SETTINGS.particle.physics.force.align.weight));
+      }
 
       particle.props.acceleration = force;
       clampLengthInPlace(particle.props.acceleration, SETTINGS.particle.physics.force.min, SETTINGS.particle.physics.force.max);
