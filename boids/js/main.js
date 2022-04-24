@@ -21,16 +21,16 @@ async function main() {
         angle: 2/3 * Math.PI,
       },
       targetIndex: 0,
-      size: 250,
+      size: 150,
       physics: {
         collision: {
           detectDistance: 8.0,
-          nQuery: 12,
-          queryStep: .05 * Math.PI,
+          nQuery: 4,
+          queryStep: .1 * Math.PI,
         },
         speed: {
-          initial: 6.0,
-          max: 8.0,
+          initial: 7.0,
+          max: 10.0,
           min: 4.0,
         },
         acceleration: {
@@ -47,15 +47,18 @@ async function main() {
           cohesion: {
             weight: 5,
           },
+          collision: {
+            weight: 200,
+          },
           min: 0.0,
-          max: 20.0,
+          max: 30.0,
         },
       },
     },
     world: {
       boundary: {
-        x: { max: 40, min: -40 },
-        y: { max: 30, min: -30 },
+        x: { max: 20, min: -20 },
+        y: { max: 15, min: -15 },
       },
     },
   };
@@ -135,11 +138,47 @@ async function main() {
   /**
    * @param {BABYLON.SolidParticle} particle 
    * @param {BABYLON.Scene} scene
-   * @returns {boolean}
+   * @returns {BABYLON.Vector3} 
+   */
+  function SearchAvoidCollision(particle, scene) {
+    const m = new BABYLON.Matrix();
+    particle.getRotationMatrix(m);
+
+    const queriedIndices = [];
+    for (let i = 1; i <= SETTINGS.particle.physics.collision.nQuery; i++) {
+      queriedIndices.push(i);
+      queriedIndices.push(-i);
+    }
+
+    for (const i of queriedIndices) {
+      const a = i * SETTINGS.particle.physics.collision.queryStep;
+      const l = new BABYLON.Vector3(Math.cos(a), Math.sin(a), 0);
+      const d = BABYLON.Vector3.TransformCoordinates(l, m);
+
+      const ray = new BABYLON.Ray(particle.position, d, SETTINGS.particle.physics.collision.detectDistance);
+      const hit = scene.pickWithRay(ray).hit;
+
+      if (!hit) {
+        return d
+          .subtractInPlace(particle.props.velocity.clone().normalize())
+          .normalize();
+      }
+    }
+
+    return BABYLON.Vector3.Zero();
+  }
+
+  /**
+   * @param {BABYLON.SolidParticle} particle 
+   * @param {BABYLON.Scene} scene
+   * @returns {BABYLON.PickingInfo | boolean}
    */
   function isColliding(particle, scene) {
     const ray = new BABYLON.Ray(particle.position, particle.props.velocity.clone().normalize(), SETTINGS.particle.physics.collision.detectDistance);
-    return scene.pickWithRay(ray).hit;
+    const info = scene.pickWithRay(ray);
+
+    if (!info.hit) { return false; }
+    return info;
   }
 
   /**
@@ -198,6 +237,26 @@ async function main() {
       return mesh;
     }
 
+    const obstacleMat = new BABYLON.StandardMaterial('ObstacleMat', scene);
+    obstacleMat.wireframe = true;
+
+    function CreateCylinderObstacle(position, diameter) {
+      const mesh = BABYLON.MeshBuilder.CreateCylinder('Obstacle', { diameter }, scene);
+      mesh.position = position;
+      mesh.rotation = new BABYLON.Vector3(.5 * Math.PI, 0, 0);
+
+      mesh.material = obstacleMat;
+
+      return mesh;
+    }
+
+    function CreateBoxObstacle(position, width, height) {
+      const mesh = BABYLON.MeshBuilder.CreateBox('Obstacle', { width, height }, scene);
+      mesh.position = position;
+      mesh.material = obstacleMat;
+      return mesh;
+    }
+
     function CreateCollisionVizMesh() {
       const mesh = BABYLON.MeshBuilder.CreateLineSystem('TargetCollisionViz', { lines: [[ BABYLON.Vector3.Zero(), BABYLON.Vector3.Zero() ]], updatable: true }, scene);
 
@@ -248,7 +307,13 @@ async function main() {
       return mesh;
     }
 
-    const camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 80, BABYLON.Vector3.Zero(), scene);
+    const camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 40, BABYLON.Vector3.Zero(), scene);
+    camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+    camera.orthoTop = SETTINGS.world.boundary.y.max;
+    camera.orthoBottom = SETTINGS.world.boundary.y.min;
+    camera.orthoLeft = SETTINGS.world.boundary.x.min;
+    camera.orthoRight = SETTINGS.world.boundary.x.max;
+
     const light = new BABYLON.HemisphericLight("Light", new BABYLON.Vector3(0, 1, 0), scene);
   
     const triangle = BABYLON.MeshBuilder.CreateDisc('Triangle', { tessellation: 3 }, scene);
@@ -281,9 +346,10 @@ async function main() {
         particle.scale = new BABYLON.Vector3(1, .5, 1);
 
         particle.color = (
-          i === SETTINGS.particle.targetIndex
-            ? SETTINGS.particle.colors.target
-            : mixColor(SETTINGS.particle.colors.light, SETTINGS.particle.colors.dark, BABYLON.Scalar.RandomRange(0, 1))
+          mixColor(SETTINGS.particle.colors.light, SETTINGS.particle.colors.dark, BABYLON.Scalar.RandomRange(0, 1))
+          // i === SETTINGS.particle.targetIndex
+          //   ? SETTINGS.particle.colors.target
+          //   : mixColor(SETTINGS.particle.colors.light, SETTINGS.particle.colors.dark, BABYLON.Scalar.RandomRange(0, 1))
         );
 
         particle.props.color = particle.color;
@@ -331,6 +397,17 @@ async function main() {
         force.addInPlace(cohesionDirection.scale(SETTINGS.particle.physics.force.cohesion.weight));
       }
 
+      const collide = isColliding(particle, scene);
+      if (collide) {
+        const avoidCollisionDirection = SearchAvoidCollision(particle, scene);
+
+        force.addInPlace(
+          avoidCollisionDirection
+            .scaleInPlace(1 / (collide.distance * collide.distance))
+            .scaleInPlace(SETTINGS.particle.physics.force.collision.weight),
+        );
+      }
+
       particle.props.acceleration = force;
       clampLengthInPlace(particle.props.acceleration, SETTINGS.particle.physics.force.min, SETTINGS.particle.physics.force.max);
 
@@ -346,36 +423,41 @@ async function main() {
     SPS.initParticles();
     SPS.setParticles();
 
-    const worldBoundingBox = CreateWorldBoundingBox();
+    // const worldBoundingBox = CreateWorldBoundingBox();
+    CreateCylinderObstacle(new BABYLON.Vector3(8, 4, 0), 6);
+    CreateCylinderObstacle(new BABYLON.Vector3(-18, -10, 0), 3);
+    CreateCylinderObstacle(new BABYLON.Vector3(-10, 9, 0), 8);
+    CreateBoxObstacle(new BABYLON.Vector3(-3, -11, 0), 6, 6);
+    CreateBoxObstacle(new BABYLON.Vector3(18, -2, 0), 3, 3);
 
     const target = new BABYLON.Mesh('Target', scene);
 
-    const viewingAreaMesh = CreateArcMesh(SETTINGS.particle.viewRange.angle);
-    viewingAreaMesh.setParent(target);
+    // const viewingAreaMesh = CreateArcMesh(SETTINGS.particle.viewRange.angle);
+    // viewingAreaMesh.setParent(target);
 
-    let targetCollisionViz = CreateCollisionVizMesh();
-    targetCollisionViz.setParent(target);
+    // let targetCollisionViz = CreateCollisionVizMesh();
+    // targetCollisionViz.setParent(target);
 
     scene.onBeforeRenderObservable.add(() => {
-      function markVisibleParticles() {
-        for (let i = 0; i < SPS.nbParticles; i++) {
-          if (i === SETTINGS.particle.targetIndex) { continue; }
-          if (isVisibleParticle(SPS.particles[SETTINGS.particle.targetIndex], SPS.particles[i])) {
-            SPS.particles[i].color = BABYLON.Color3.Yellow();
-          } else {
-            SPS.particles[i].color = SPS.particles[i].props.color;
-          }
-        }
-      }
+      // function markVisibleParticles() {
+      //   for (let i = 0; i < SPS.nbParticles; i++) {
+      //     if (i === SETTINGS.particle.targetIndex) { continue; }
+      //     if (isVisibleParticle(SPS.particles[SETTINGS.particle.targetIndex], SPS.particles[i])) {
+      //       SPS.particles[i].color = BABYLON.Color3.Yellow();
+      //     } else {
+      //       SPS.particles[i].color = SPS.particles[i].props.color;
+      //     }
+      //   }
+      // }
 
       function updateTargetMesh() {
         target.position.copyFrom(SPS.particles[SETTINGS.particle.targetIndex].position);
         target.rotation.copyFrom(SPS.particles[SETTINGS.particle.targetIndex].rotation);
       }
 
-      markVisibleParticles();
+      // markVisibleParticles();
       updateTargetMesh();
-      targetCollisionViz = UpdateCollisionVizMesh(targetCollisionViz, SPS.particles[SETTINGS.particle.targetIndex], target);
+      // targetCollisionViz = UpdateCollisionVizMesh(targetCollisionViz, SPS.particles[SETTINGS.particle.targetIndex], target);
 
       SPS.setParticles();
     });
