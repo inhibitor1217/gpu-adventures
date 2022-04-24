@@ -17,27 +17,30 @@ async function main() {
         target: BABYLON.Color3.Red(),
       },
       viewRange: {
-        distance: 4.0,
+        distance: 8.0,
         angle: 2/3 * Math.PI,
       },
       targetIndex: 0,
-      size: 150,
+      size: 250,
       physics: {
         speed: {
-          initial: 8.0,
-          max: 10.0,
-          min: 6.0,
+          initial: 6.0,
+          max: 8.0,
+          min: 4.0,
         },
         acceleration: {
           max: 1.0,
         },
         force: {
           repulsion: {
-            weight: 50,
+            weight: 3,
             detectDistance: 5,
           },
           align: {
-            weight: 10,
+            weight: 1,
+          },
+          cohesion: {
+            weight: 5,
           },
           min: 0.0,
           max: 20.0,
@@ -46,8 +49,8 @@ async function main() {
     },
     world: {
       boundary: {
-        x: { max: 20, min: -20 },
-        y: { max: 15, min: -15 },
+        x: { max: 40, min: -40 },
+        y: { max: 30, min: -30 },
       },
     },
   };
@@ -160,7 +163,7 @@ async function main() {
       return mesh;
     }
 
-    const camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 40, BABYLON.Vector3.Zero(), scene);
+    const camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 80, BABYLON.Vector3.Zero(), scene);
     const light = new BABYLON.HemisphericLight("Light", new BABYLON.Vector3(0, 1, 0), scene);
   
     const triangle = BABYLON.MeshBuilder.CreateDisc('Triangle', { tessellation: 3 }, scene);
@@ -209,6 +212,7 @@ async function main() {
 
       let flockSize = 0;
       const avgFlockDirection = BABYLON.Vector3.Zero();
+      const avgFlockPosition = BABYLON.Vector3.Zero();
 
       for (let i = 0; i < SPS.nbParticles; i++) {
         if (i === particle.idx) { continue; }
@@ -218,6 +222,7 @@ async function main() {
         if (isVisibleParticle(particle, SPS.particles[i])) {
           flockSize += 1;
           avgFlockDirection.addInPlace(SPS.particles[i].props.velocity.clone().normalize());
+          avgFlockPosition.addInPlace(SPS.particles[i].position);
         }
       }
 
@@ -233,6 +238,13 @@ async function main() {
           .normalize();
 
         force.addInPlace(steerDirection.scale(SETTINGS.particle.physics.force.align.weight));
+
+        const cohesionDirection = avgFlockPosition
+          .scaleInPlace(1 / flockSize)
+          .subtract(particle.position)
+          .normalize();
+
+        force.addInPlace(cohesionDirection.scale(SETTINGS.particle.physics.force.cohesion.weight));
       }
 
       particle.props.acceleration = force;
