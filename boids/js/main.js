@@ -9,11 +9,33 @@ async function main() {
   const engine = new BABYLON.WebGPUEngine(canvas, { preserveDrawingBuffer: true, stencil: true });
   await engine.initAsync();
 
+  const rect = engine.getRenderingCanvasClientRect();
+  const aspectRatio = rect.width / rect.height;
+
+  const HexColor = hex => {
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+    return new BABYLON.Color3(r, g, b);
+  }
+
   const SETTINGS = {
     particle: {
       colors: {
-        light: new BABYLON.Color3(.43, .78, 1),
-        dark: new BABYLON.Color3(0, .41, .75),
+        themes: [
+          {
+            light: HexColor('6ec6ff'),
+            dark: HexColor('0069c0'),
+          },
+          {
+            light: HexColor('6ff9ff'),
+            dark: HexColor('0095a8'),
+          },
+          {
+            light: HexColor('98ee99'),
+            dark: HexColor('66bb6a'),
+          },
+        ],
         target: BABYLON.Color3.Red(),
       },
       viewRange: {
@@ -21,7 +43,7 @@ async function main() {
         angle: 2/3 * Math.PI,
       },
       targetIndex: 0,
-      size: 150,
+      size: 250,
       physics: {
         collision: {
           detectDistance: 8.0,
@@ -57,26 +79,11 @@ async function main() {
     },
     world: {
       boundary: {
-        x: { max: 20, min: -20 },
-        y: { max: 15, min: -15 },
+        x: { max: 30, min: -30 },
+        y: { max: 30 / aspectRatio, min: -30 / aspectRatio },
       },
     },
   };
-
-  /**
-   * @param {BABYLON.Color3} one 
-   * @param {BABYLON.Color3} other 
-   * @param {number} t 
-   * @returns {BABYLON.Color3}
-   */
-  function mixColor(one, other, t) {
-    const lerp = (a, b, t) => a * (1 - t) + b * t;
-    return new BABYLON.Color3(
-      lerp(one.r, other.r, t),
-      lerp(one.g, other.g, t),
-      lerp(one.b, other.b, t),
-    );
-  }
 
   /**
    * @param {BABYLON.Vector3} vec 
@@ -238,7 +245,7 @@ async function main() {
     }
 
     const obstacleMat = new BABYLON.StandardMaterial('ObstacleMat', scene);
-    obstacleMat.wireframe = true;
+    obstacleMat.diffuseColor = HexColor('212121');
 
     function CreateCylinderObstacle(position, diameter) {
       const mesh = BABYLON.MeshBuilder.CreateCylinder('Obstacle', { diameter }, scene);
@@ -345,12 +352,8 @@ async function main() {
 
         particle.scale = new BABYLON.Vector3(1, .5, 1);
 
-        particle.color = (
-          mixColor(SETTINGS.particle.colors.light, SETTINGS.particle.colors.dark, BABYLON.Scalar.RandomRange(0, 1))
-          // i === SETTINGS.particle.targetIndex
-          //   ? SETTINGS.particle.colors.target
-          //   : mixColor(SETTINGS.particle.colors.light, SETTINGS.particle.colors.dark, BABYLON.Scalar.RandomRange(0, 1))
-        );
+        const theme = SETTINGS.particle.colors.themes[i % SETTINGS.particle.colors.themes.length];
+        particle.color = BABYLON.Color3.Lerp(theme.light, theme.dark, BABYLON.Scalar.RandomRange(0, 1))
 
         particle.props.color = particle.color;
       }
@@ -367,6 +370,7 @@ async function main() {
 
       for (let i = 0; i < SPS.nbParticles; i++) {
         if (i === particle.idx) { continue; }
+        if (i % 3 !== particle.idx % 3) { continue; }
 
         repulsionForce.addInPlace(RepulsionForce(particle, SPS.particles[i]));
 
