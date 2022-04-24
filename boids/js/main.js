@@ -6,8 +6,7 @@
 async function main() {
   const canvas = document.getElementById('root');
   
-  const engine = new BABYLON.WebGPUEngine(canvas, { preserveDrawingBuffer: true, stencil: true });
-  await engine.initAsync();
+  const engine = new BABYLON.Engine(canvas, { preserveDrawingBuffer: true, stencil: true });
 
   const rect = engine.getRenderingCanvasClientRect();
   const aspectRatio = rect.width / rect.height;
