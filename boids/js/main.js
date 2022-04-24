@@ -24,7 +24,7 @@ async function main() {
       size: 250,
       physics: {
         collision: {
-          detectDistance: 5,
+          detectDistance: 8.0,
           nQuery: 12,
           queryStep: .05 * Math.PI,
         },
@@ -199,7 +199,53 @@ async function main() {
     }
 
     function CreateCollisionVizMesh() {
-      return BABYLON.MeshBuilder.CreateLineSystem('TargetCollisionViz', { lines: [], updatable: true }, scene);
+      const mesh = BABYLON.MeshBuilder.CreateLineSystem('TargetCollisionViz', { lines: [[ BABYLON.Vector3.Zero(), BABYLON.Vector3.Zero() ]], updatable: true }, scene);
+
+      mesh.color = BABYLON.Color3.Green();
+
+      return mesh;
+    }
+
+    /**
+     * @param {BABYLON.Mesh} mesh 
+     * @param {BABYLON.SolidParticle} particle
+     * @param {BABYLON.Mesh} target 
+     * @returns {BABYLON.Mesh}
+     */
+    function UpdateCollisionVizMesh(mesh, particle, target) {
+      if (!isColliding(particle, scene)) {
+        return BABYLON.MeshBuilder.CreateLineSystem('TargetCollisionViz', { lines: [[ BABYLON.Vector3.Zero(), BABYLON.Vector3.Zero() ]], instance: mesh });
+      }
+
+      const m = target.getWorldMatrix().getRotationMatrix();
+
+      const queriedIndices = [];
+      for (let i = 0; i <= SETTINGS.particle.physics.collision.nQuery; i++) {
+        queriedIndices.push(i);
+        if (i !== 0) { queriedIndices.push(-i); }
+      }
+
+      for (const i of queriedIndices) {
+        const a = i * SETTINGS.particle.physics.collision.queryStep;
+        const l = new BABYLON.Vector3(Math.cos(a), Math.sin(a), 0);
+        const d = BABYLON.Vector3.TransformCoordinates(l, m);
+
+        const ray = new BABYLON.Ray(particle.position, d, SETTINGS.particle.physics.collision.detectDistance);
+        const hit = scene.pickWithRay(ray).hit;
+
+        if (!hit) {
+          const lines = [
+            [
+              BABYLON.Vector3.Zero(),
+              l.scale(SETTINGS.particle.physics.collision.detectDistance),
+            ],
+          ];
+
+          return BABYLON.MeshBuilder.CreateLineSystem('TargetCollisionViz', { lines, instance: mesh });
+        }
+      }
+
+      return mesh;
     }
 
     const camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 2, 80, BABYLON.Vector3.Zero(), scene);
@@ -307,7 +353,7 @@ async function main() {
     const viewingAreaMesh = CreateArcMesh(SETTINGS.particle.viewRange.angle);
     viewingAreaMesh.setParent(target);
 
-    const targetCollisionViz = CreateCollisionVizMesh();
+    let targetCollisionViz = CreateCollisionVizMesh();
     targetCollisionViz.setParent(target);
 
     scene.onBeforeRenderObservable.add(() => {
@@ -329,6 +375,7 @@ async function main() {
 
       markVisibleParticles();
       updateTargetMesh();
+      targetCollisionViz = UpdateCollisionVizMesh(targetCollisionViz, SPS.particles[SETTINGS.particle.targetIndex], target);
 
       SPS.setParticles();
     });
