@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "private": true,
   "workspaces": [
-    "boids"
+    "boids",
+    "boids-3d"
   ],
   "devDependencies": {
     "babylonjs": "^5.3.0"
