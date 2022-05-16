@@ -5,6 +5,7 @@ const {
   Color3,
   Engine,
   HemisphericLight,
+  KeyboardEventTypes,
   MeshBuilder,
   Scalar,
   Scene,
@@ -28,9 +29,33 @@ const Physics = {
     if (position.z < $ENV.world.z.min) { ret.z += $ENV.world.size; }
     return ret;
   },
+
+  /**
+   * @param {BABYLON.Vector3} position
+   * @param {BABYLON.Vector3} attraction
+   * @returns {BABYLON.Vector3}
+   */
+  Attraction: function Attraction(position, attraction) {
+    const towards = attraction.subtract(position).normalize();
+    return towards.scale($ENV.force.attraction.weight);
+  },
 };
 
 const Utils = {
+  Vector3: {
+    /**
+     * @param {BABYLON.Vector3} vector 
+     * @param {number | undefined} minLength 
+     * @param {number | undefined} maxLength 
+     * @returns {BABYLON.Vector3}
+     */
+    ClampLength: function ClampLength(vector, minLength, maxLength) {
+      if (minLength !== undefined && vector.length() < minLength) { return vector.clone().normalize().scale(minLength); }
+      if (maxLength !== undefined && vector.length() > maxLength) { return vector.clone().normalize().scale(maxLength); }
+      return vector;
+    },
+  },
+
   Rotation: {
     /**
      * @returns {BABYLON.Vector3}
@@ -69,27 +94,30 @@ const Utils = {
 
 const $ENV = {
   world: {
-    center: Vector3.Zero(),
-    size: 20,
+    center: () => Vector3.Zero(),
+    size: 30,
   },
   boids: {
-    population: 10,
+    population: 30,
     speed: { min: 8, max: 12 },
     color: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
+  },
+  force: {
+    attraction: { weight: 20 },
   },
 };
 
 $ENV.world.x = {
-  max: $ENV.world.center.x + 0.5 * $ENV.world.size,
-  min: $ENV.world.center.x - 0.5 * $ENV.world.size,
+  max: $ENV.world.center().x + 0.5 * $ENV.world.size,
+  min: $ENV.world.center().x - 0.5 * $ENV.world.size,
 };
 $ENV.world.y = {
-  max: $ENV.world.center.y + 0.5 * $ENV.world.size,
-  min: $ENV.world.center.y - 0.5 * $ENV.world.size,
+  max: $ENV.world.center().y + 0.5 * $ENV.world.size,
+  min: $ENV.world.center().y - 0.5 * $ENV.world.size,
 };
 $ENV.world.z = {
-  max: $ENV.world.center.z + 0.5 * $ENV.world.size,
-  min: $ENV.world.center.z - 0.5 * $ENV.world.size,
+  max: $ENV.world.center().z + 0.5 * $ENV.world.size,
+  min: $ENV.world.center().z - 0.5 * $ENV.world.size,
 };
 
 function main() {
@@ -103,10 +131,41 @@ function main() {
    */
   function World(scene) {
     const world = MeshBuilder.CreateBox('world', { size: $ENV.world.size }, scene);
-    world.position = $ENV.world.center;
+    world.position = $ENV.world.center();
     world.material = new StandardMaterial('world-mat', scene);
     world.material.wireframe = true;
     return world;
+  }
+
+  /**
+   * @param {BABYLON.Scene} scene
+   * @returns {BABYLON.Mesh}
+   */
+  function AttractionPoint(scene) {
+    const attraction = MeshBuilder.CreateSphere('attraction-point', { diameter: 1 }, scene);
+    attraction.position = $ENV.world.center();
+    attraction.material = new StandardMaterial('attraction-point-mat', scene);
+    attraction.material.diffuseColor = Utils.Color.Hex('ff0000');
+
+    // Add keyboard controls
+    scene.onKeyboardObservable.add(keyboardInfo => {
+      switch (keyboardInfo.type) {
+        case KeyboardEventTypes.KEYDOWN:
+          switch (keyboardInfo.event.key) {
+            case 'w': { attraction.position.x += 0.5; break; }
+            case 'a': { attraction.position.z += 0.5; break; }
+            case 's': { attraction.position.x -= 0.5; break; }
+            case 'd': { attraction.position.z -= 0.5; break; }
+            case 'q': { attraction.position.y += 0.5; break; }
+            case 'e': { attraction.position.y -= 0.5; break; }
+          }
+          break
+      }
+
+      attraction.position = Physics.SanitizePosition(attraction.position);
+    });
+
+    return attraction;
   }
 
   /**
@@ -157,6 +216,14 @@ function main() {
     sps.updateParticle = function UpdateBoid(boid) {
       const deltaTime = engine.getDeltaTime() * 0.001;
 
+      const force = Vector3.Zero();
+      const attraction = scene.getMeshByName('attraction-point');
+      if (attraction) { force.addInPlace(Physics.Attraction(boid.position, attraction.position)); }
+
+      boid.props.velocity.addInPlace(force.scale(deltaTime));
+      boid.props.velocity = Utils.Vector3.ClampLength(boid.props.velocity, $ENV.boids.speed.min, $ENV.boids.speed.max);
+
+      boid.rotation = Utils.Rotation.FromDirection(boid.props.velocity);
       boid.position = Physics.SanitizePosition(boid.position.add(boid.props.velocity.scale(deltaTime)));
     }
     
@@ -170,6 +237,7 @@ function main() {
 
     const world = World(scene);  
     const light = AmbientLight(scene, Vector3.Up());
+    const attraction = AttractionPoint(scene);
 
     const boidParticleSystem = BoidParticleSystem(scene);
     boidParticleSystem.initParticles();
