@@ -21,12 +21,12 @@ const Physics = {
    */
   SanitizePosition: function SanitizePosition(position) {
     const ret = position.clone();
-    if (position.x > $ENV.world.x.max) { ret.x -= $ENV.world.size; }
-    if (position.x < $ENV.world.x.min) { ret.x += $ENV.world.size; }
-    if (position.y > $ENV.world.y.max) { ret.y -= $ENV.world.size; }
-    if (position.y < $ENV.world.y.min) { ret.y += $ENV.world.size; }
-    if (position.z > $ENV.world.z.max) { ret.z -= $ENV.world.size; }
-    if (position.z < $ENV.world.z.min) { ret.z += $ENV.world.size; }
+    if (position.x > $ENV.world.x.max) { ret.x -= $ENV.world.size.x; }
+    if (position.x < $ENV.world.x.min) { ret.x += $ENV.world.size.x; }
+    if (position.y > $ENV.world.y.max) { ret.y -= $ENV.world.size.y; }
+    if (position.y < $ENV.world.y.min) { ret.y += $ENV.world.size.y; }
+    if (position.z > $ENV.world.z.max) { ret.z -= $ENV.world.size.z; }
+    if (position.z < $ENV.world.z.min) { ret.z += $ENV.world.size.z; }
     return ret;
   },
 
@@ -54,11 +54,20 @@ const Physics = {
   /**
    * @param {BABYLON.Vector3} position
    * @param {BABYLON.Vector3} other 
-   * @returns BABYLON.Vector3
+   * @returns {BABYLON.Vector3}
    */
   Cohesion: function Cohesion(position, other) {
     const diff = other.subtract(position);
     return diff.scale($ENV.force.cohesion.weight);
+  },
+
+  /**
+   * @param {BABYLON.Vector3} direction
+   * @param {BABYLON.Vector3} targetDirection
+   * @returns {BABYLON.Vector3}
+   */
+  Alignment: function Alignment(direction, targetDirection) {
+    return targetDirection.subtract(direction).normalize().scale($ENV.force.alignment.weight);
   },
 };
 
@@ -116,31 +125,33 @@ const Utils = {
 const $ENV = {
   world: {
     center: () => Vector3.Zero(),
-    size: 30,
+    size: { x: 50, y: 30, z: 50 },
   },
   boids: {
-    population: 80,
+    population: 150,
     speed: { min: 8, max: 12 },
     color: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
+    flock: { range: 8 },
   },
   force: {
     attraction: { weight: 50 },
-    repulsion: { weight: 20, max: 250 },
-    cohesion: { weight: 30, range: 5 },
+    repulsion: { weight: 13, max: 250 },
+    cohesion: { weight: 10 },
+    alignment: { weight: 3 },
   },
 };
 
 $ENV.world.x = {
-  max: $ENV.world.center().x + 0.5 * $ENV.world.size,
-  min: $ENV.world.center().x - 0.5 * $ENV.world.size,
+  max: $ENV.world.center().x + 0.5 * $ENV.world.size.x,
+  min: $ENV.world.center().x - 0.5 * $ENV.world.size.x,
 };
 $ENV.world.y = {
-  max: $ENV.world.center().y + 0.5 * $ENV.world.size,
-  min: $ENV.world.center().y - 0.5 * $ENV.world.size,
+  max: $ENV.world.center().y + 0.5 * $ENV.world.size.y,
+  min: $ENV.world.center().y - 0.5 * $ENV.world.size.y,
 };
 $ENV.world.z = {
-  max: $ENV.world.center().z + 0.5 * $ENV.world.size,
-  min: $ENV.world.center().z - 0.5 * $ENV.world.size,
+  max: $ENV.world.center().z + 0.5 * $ENV.world.size.z,
+  min: $ENV.world.center().z - 0.5 * $ENV.world.size.z,
 };
 
 function main() {
@@ -153,7 +164,7 @@ function main() {
    * @returns {BABYLON.Mesh}
    */
   function World(scene) {
-    const world = MeshBuilder.CreateBox('world', { size: $ENV.world.size }, scene);
+    const world = MeshBuilder.CreateBox('world', { width: $ENV.world.size.x, height: $ENV.world.size.y, depth: $ENV.world.size.z }, scene);
     world.position = $ENV.world.center();
     world.material = new StandardMaterial('world-mat', scene);
     world.material.wireframe = true;
@@ -250,18 +261,27 @@ function main() {
       }
 
       const centerOfFlock = Vector3.Zero();
+      const directionOfFlock = Vector3.Zero();
       let flockSize = 0;
 
       for (let i = 0; i < sps.nbParticles; i += 1) {
+        if (i === boid.idx) { continue; }
+
         const diff = boid.position.subtract(sps.particles[i].position);
-        if (diff.length() > $ENV.force.cohesion.range) { continue; }
+        if (diff.length() > $ENV.boids.flock.range) { continue; }
+
         flockSize += 1;
         centerOfFlock.addInPlace(sps.particles[i].position);
+        directionOfFlock.addInPlace(sps.particles[i].props.velocity.clone().normalize());
       }
 
-      if (flockSize > 0) { centerOfFlock.scaleInPlace(1 / flockSize); }
+      if (flockSize > 0) {
+        centerOfFlock.scaleInPlace(1 / flockSize);
+        directionOfFlock.scaleInPlace(1 / flockSize);
+      }
 
       force.addInPlace(Physics.Cohesion(boid.position, centerOfFlock));
+      force.addInPlace(Physics.Alignment(boid.props.velocity.clone().normalize(), directionOfFlock));
 
       boid.props.velocity.addInPlace(force.scale(deltaTime));
       boid.props.velocity = Utils.Vector3.ClampLength(boid.props.velocity, $ENV.boids.speed.min, $ENV.boids.speed.max);
