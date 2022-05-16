@@ -50,6 +50,16 @@ const Physics = {
     const scale = Scalar.Clamp($ENV.force.repulsion.weight / diff.lengthSquared(), undefined, $ENV.force.repulsion.max);
     return diff.normalize().scale(scale);
   },
+
+  /**
+   * @param {BABYLON.Vector3} position
+   * @param {BABYLON.Vector3} other 
+   * @returns BABYLON.Vector3
+   */
+  Cohesion: function Cohesion(position, other) {
+    const diff = other.subtract(position);
+    return diff.scale($ENV.force.cohesion.weight);
+  },
 };
 
 const Utils = {
@@ -116,6 +126,7 @@ const $ENV = {
   force: {
     attraction: { weight: 50 },
     repulsion: { weight: 20, max: 250 },
+    cohesion: { weight: 30, range: 5 },
   },
 };
 
@@ -238,6 +249,20 @@ function main() {
         force.addInPlace(Physics.Repulsion(boid.position, sps.particles[i].position));
       }
 
+      const centerOfFlock = Vector3.Zero();
+      let flockSize = 0;
+
+      for (let i = 0; i < sps.nbParticles; i += 1) {
+        const diff = boid.position.subtract(sps.particles[i].position);
+        if (diff.length() > $ENV.force.cohesion.range) { continue; }
+        flockSize += 1;
+        centerOfFlock.addInPlace(sps.particles[i].position);
+      }
+
+      if (flockSize > 0) { centerOfFlock.scaleInPlace(1 / flockSize); }
+
+      force.addInPlace(Physics.Cohesion(boid.position, centerOfFlock));
+
       boid.props.velocity.addInPlace(force.scale(deltaTime));
       boid.props.velocity = Utils.Vector3.ClampLength(boid.props.velocity, $ENV.boids.speed.min, $ENV.boids.speed.max);
 
@@ -255,7 +280,7 @@ function main() {
 
     const world = World(scene);  
     const light = AmbientLight(scene, Vector3.Up());
-    const attraction = AttractionPoint(scene);
+    // const attraction = AttractionPoint(scene);
 
     const boidParticleSystem = BoidParticleSystem(scene);
     boidParticleSystem.initParticles();
