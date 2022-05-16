@@ -7,6 +7,7 @@ const {
   HemisphericLight,
   KeyboardEventTypes,
   MeshBuilder,
+  Ray,
   Scalar,
   Scene,
   SolidParticleSystem,
@@ -20,14 +21,14 @@ const Physics = {
    * @returns {BABYLON.Vector3}
    */
   SanitizePosition: function SanitizePosition(position) {
-    const ret = position.clone();
-    if (position.x > $ENV.world.x.max) { ret.x -= $ENV.world.size.x; }
-    if (position.x < $ENV.world.x.min) { ret.x += $ENV.world.size.x; }
-    if (position.y > $ENV.world.y.max) { ret.y -= $ENV.world.size.y; }
-    if (position.y < $ENV.world.y.min) { ret.y += $ENV.world.size.y; }
-    if (position.z > $ENV.world.z.max) { ret.z -= $ENV.world.size.z; }
-    if (position.z < $ENV.world.z.min) { ret.z += $ENV.world.size.z; }
-    return ret;
+    const ret = Vector3.Zero();
+    if (position.x > $ENV.world.x.max) { ret.x += $ENV.world.x.max - position.x; }
+    if (position.x < $ENV.world.x.min) { ret.x += $ENV.world.x.min - position.x; }
+    if (position.y > $ENV.world.y.max) { ret.y += $ENV.world.y.max - position.y; }
+    if (position.y < $ENV.world.y.min) { ret.y += $ENV.world.y.min - position.y; }
+    if (position.z > $ENV.world.z.max) { ret.z += $ENV.world.z.max - position.z; }
+    if (position.z < $ENV.world.z.min) { ret.z += $ENV.world.z.min - position.z; }
+    return ret.scale(120);
   },
 
   /**
@@ -134,7 +135,7 @@ const $ENV = {
     flock: { range: 8 },
   },
   force: {
-    attraction: { weight: 50 },
+    attraction: { weight: 25 },
     repulsion: { weight: 13, max: 250 },
     cohesion: { weight: 10 },
     alignment: { weight: 3 },
@@ -195,8 +196,6 @@ function main() {
           }
           break
       }
-
-      attraction.position = Physics.SanitizePosition(attraction.position);
     });
 
     return attraction;
@@ -249,6 +248,7 @@ function main() {
      */
     sps.updateParticle = function UpdateBoid(boid) {
       const deltaTime = engine.getDeltaTime() * 0.001;
+      const direction = boid.props.velocity.clone().normalize();
 
       const force = Vector3.Zero();
 
@@ -281,13 +281,14 @@ function main() {
       }
 
       force.addInPlace(Physics.Cohesion(boid.position, centerOfFlock));
-      force.addInPlace(Physics.Alignment(boid.props.velocity.clone().normalize(), directionOfFlock));
+      force.addInPlace(Physics.Alignment(direction, directionOfFlock));
+      force.addInPlace(Physics.SanitizePosition(boid.position));
 
       boid.props.velocity.addInPlace(force.scale(deltaTime));
       boid.props.velocity = Utils.Vector3.ClampLength(boid.props.velocity, $ENV.boids.speed.min, $ENV.boids.speed.max);
 
       boid.rotation = Utils.Rotation.FromDirection(boid.props.velocity);
-      boid.position = Physics.SanitizePosition(boid.position.add(boid.props.velocity.scale(deltaTime)));
+      boid.position = boid.position.add(boid.props.velocity.scale(deltaTime));
     }
     
     return sps;
