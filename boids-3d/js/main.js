@@ -39,6 +39,17 @@ const Physics = {
     const towards = attraction.subtract(position).normalize();
     return towards.scale($ENV.force.attraction.weight);
   },
+
+  /**
+   * @param {BABYLON.Vector3} position
+   * @param {BABYLON.Vector3} other
+   * @returns {BABYLON.Vector3}
+   */
+  Repulsion: function Repulsion(position, other) {
+    const diff = position.subtract(other);
+    const scale = Scalar.Clamp($ENV.force.repulsion.weight / diff.lengthSquared(), undefined, $ENV.force.repulsion.max);
+    return diff.normalize().scale(scale);
+  },
 };
 
 const Utils = {
@@ -98,12 +109,13 @@ const $ENV = {
     size: 30,
   },
   boids: {
-    population: 30,
+    population: 80,
     speed: { min: 8, max: 12 },
     color: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
   },
   force: {
-    attraction: { weight: 20 },
+    attraction: { weight: 50 },
+    repulsion: { weight: 20, max: 250 },
   },
 };
 
@@ -217,8 +229,14 @@ function main() {
       const deltaTime = engine.getDeltaTime() * 0.001;
 
       const force = Vector3.Zero();
+
       const attraction = scene.getMeshByName('attraction-point');
       if (attraction) { force.addInPlace(Physics.Attraction(boid.position, attraction.position)); }
+
+      for (let i = 0; i < sps.nbParticles; i += 1) {
+        if (i === boid.idx) { continue; }
+        force.addInPlace(Physics.Repulsion(boid.position, sps.particles[i].position));
+      }
 
       boid.props.velocity.addInPlace(force.scale(deltaTime));
       boid.props.velocity = Utils.Vector3.ClampLength(boid.props.velocity, $ENV.boids.speed.min, $ENV.boids.speed.max);
