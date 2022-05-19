@@ -141,19 +141,19 @@ const Utils = {
 const $ENV = {
   world: {
     center: () => Vector3.Zero(),
-    size: { x: 50, y: 30, z: 50 },
+    size: { x: 100, y: 50, z: 100 },
   },
   boids: {
-    population: 150,
-    speed: { min: 8, max: 12 },
+    population: 500,
+    speed: { min: 12, max: 16 },
     color: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
-    flock: { range: 8, viewport: 0.6 * Math.PI },
+    flock: { range: 12, viewport: 0.7 * Math.PI },
   },
   force: {
-    attraction: { weight: 25 },
-    repulsion: { weight: 20, max: 250 },
-    cohesion: { weight: 20 },
-    alignment: { weight: 2 },
+    attraction: { weight: 50 },
+    repulsion: { weight: 40, max: 500 },
+    cohesion: { weight: 10 },
+    alignment: { weight: 10 },
   },
 };
 
@@ -311,7 +311,7 @@ function main() {
 
   function createScene(){
     const scene = new Scene(engine);
-    const camera = new ArcRotateCamera('camera', .25 * Math.PI, .25 * Math.PI, 40, Vector3.Zero(), scene);
+    const camera = new ArcRotateCamera('camera', .25 * Math.PI, .25 * Math.PI, 80, Vector3.Zero(), scene);
     camera.attachControl(canvas, false);
 
     const world = World(scene);  
