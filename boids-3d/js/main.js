@@ -6,6 +6,7 @@ const {
   Engine,
   HemisphericLight,
   KeyboardEventTypes,
+  Mesh,
   MeshBuilder,
   Ray,
   Scalar,
@@ -13,6 +14,7 @@ const {
   SolidParticleSystem,
   StandardMaterial,
   Vector3,
+  VertexData,
 } = BABYLON;
 
 const Physics = {
@@ -28,7 +30,7 @@ const Physics = {
     if (position.y < $ENV.world.y.min) { ret.y += $ENV.world.y.min - position.y; }
     if (position.z > $ENV.world.z.max) { ret.z += $ENV.world.z.max - position.z; }
     if (position.z < $ENV.world.z.min) { ret.z += $ENV.world.z.min - position.z; }
-    return ret.scale(120);
+    return ret.scale($ENV.force.avoidCollision.weight);
   },
 
   /**
@@ -70,6 +72,15 @@ const Physics = {
   Alignment: function Alignment(direction, targetDirection) {
     return targetDirection.subtract(direction).normalize().scale($ENV.force.alignment.weight);
   },
+
+  /**
+   * @param {BABYLON.Vector3} direction
+   * @param {BABYLON.Vector3} targetDirection
+   * @returns {BABYLON.Vector3}
+   */
+  AvoidCollision: function AvoidCollision(direction, targetDirection) {
+    return targetDirection.subtract(direction).normalize().scale($ENV.force.avoidCollision.weight);
+  },
 };
 
 const Utils = {
@@ -85,6 +96,39 @@ const Utils = {
       if (maxLength !== undefined && vector.length() > maxLength) { return vector.clone().normalize().scale(maxLength); }
       return vector;
     },
+
+    Probes: (() => {
+      const angleIncrement = Math.PI * (1 + Math.sqrt(5));
+      const ret = [];
+      const len = 16;
+      for (let i = 0; i < len; i += 1) {
+          const t = i / len;
+          const inclination = Math.acos(1 - 2 * t);
+          const azimuth = angleIncrement * i;
+
+          const x = Math.sin(inclination) * Math.cos(azimuth);
+          const y = Math.sin(inclination) * Math.sin(azimuth);
+          const z = Math.cos(inclination);
+
+          ret.push(new Vector3(x, y, z));
+      }
+
+      /**
+       * @param {BABYLON.Vector3} direction
+       * @returns {BABYLON.Vector3[]}
+       */
+      return function Probes(direction) {
+        const forward = direction;
+        const right = Vector3.Cross(forward, Vector3.Right()).normalize();
+        const up = Vector3.Cross(forward, right).normalize();
+
+        return ret.map(probe =>
+          forward.scale(probe.z)
+            .add(right.scale(probe.x))
+            .add(up.scale(probe.y))
+        );
+      };
+    })(),
   },
 
   Flock: {
@@ -141,19 +185,22 @@ const Utils = {
 const $ENV = {
   world: {
     center: () => Vector3.Zero(),
-    size: { x: 100, y: 50, z: 100 },
+    size: { x: 80, y: 30, z: 80 },
   },
   boids: {
     population: 500,
     speed: { min: 12, max: 16 },
     color: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
     flock: { range: 12, viewport: 0.7 * Math.PI },
+    collision: { range: 4 },
   },
   force: {
+    max: 500,
     attraction: { weight: 50 },
     repulsion: { weight: 40, max: 500 },
     cohesion: { weight: 10 },
     alignment: { weight: 10 },
+    avoidCollision: { weight: 400 },
   },
 };
 
@@ -218,11 +265,107 @@ function main() {
 
   /**
    * @param {BABYLON.Scene} scene
+   * @param {BABYLON.Vector3} position
+   * @returns {BABYLON.Mesh}
+   */
+  function PillarObstacle(scene, position) {
+    const pillar = MeshBuilder.CreateBox('pillar', { width: 4, height: $ENV.world.size.y, depth: 4 }, scene);
+    pillar.position = position;
+    pillar.position.y = 0;
+    pillar.material = new StandardMaterial('pillar-mat', scene);
+    pillar.material.diffuseColor = Utils.Color.Hex('9e9e9e');
+    return pillar;
+  }
+
+  /**
+   * @param {BABYLON.Scene} scene 
+   * @param {BABYLON.Vector3} position 
+   * @param {number} size 
+   * @returns {BABYLON.Mesh}
+   */
+  function TorusObstacle(scene, position, size, thickness) {
+    const torus = MeshBuilder.CreateTorus('torus', { diameter: size, thickness, tessellation: 32 }, scene);
+    torus.position = position;
+    torus.rotation = new Vector3(0.5 * Math.PI, 0, 0);
+    torus.material = new StandardMaterial('torus-mat', scene);
+    torus.material.diffuseColor = Utils.Color.Hex('f9a825');
+    return torus;
+  }
+
+  /**
+   * @param {BABYLON.Scene} scene
+   * @returns {BABYLON.Mesh} 
+   */
+  function ElevatedGroundObstacle(scene) {
+    const side = [
+      new Vector3($ENV.world.x.min, $ENV.world.y.min    , $ENV.world.z.min),
+      new Vector3($ENV.world.x.max, $ENV.world.y.min    , $ENV.world.z.min),
+      new Vector3($ENV.world.x.max, $ENV.world.y.min + 1, $ENV.world.z.min),
+      new Vector3(              20, $ENV.world.y.min    , $ENV.world.z.min),
+      new Vector3(              10, $ENV.world.y.min + 5, $ENV.world.z.min),
+      new Vector3(             -10, $ENV.world.y.min + 5, $ENV.world.z.min),
+      new Vector3(             -20, $ENV.world.y.min    , $ENV.world.z.min),
+      new Vector3($ENV.world.x.min, $ENV.world.y.min + 1, $ENV.world.z.min),
+      new Vector3($ENV.world.x.min, $ENV.world.y.min    , $ENV.world.z.min),
+    ];
+    const extrudePath = [
+      new Vector3(0, 0, 0),
+      new Vector3(0, 0, $ENV.world.size.z),
+    ];
+    const elevatedGround = MeshBuilder.ExtrudeShape(
+      "elevated-ground",
+      {
+        shape: side,
+        path: extrudePath,
+        cap: Mesh.CAP_ALL,
+      },
+      scene,
+    );
+    elevatedGround.material = new StandardMaterial('elevated-ground-mat', scene);
+    elevatedGround.material.diffuseColor = Utils.Color.Hex('424242');
+    return elevatedGround;
+  }
+
+  /**
+   * @param {BABYLON.Scene} scene
    * @param {BABYLON.Vector3} direction
    * @returns {BABYLON.Light} 
    */
   function AmbientLight(scene, direction) {
     return new HemisphericLight('ambient-light', direction, scene);
+  }
+
+  /**
+   * @param {BABYLON.Scene} scene 
+   * @param {BABYLON.Vector3} position
+   * @param {BABYLON.Vector3} direction 
+   * @param {number} radius
+   * @returns {boolean} 
+   */
+  function IsColliding(scene, position, direction, radius) {
+    const ray = new Ray(position, direction, radius);
+    const hitInfo = scene.pickWithRay(ray);
+    return hitInfo.hit;
+  }
+
+  /**
+   * @param {BABYLON.Scene} scene 
+   * @param {BABYLON.Vector3} position
+   * @param {BABYLON.Vector3} direction 
+   * @param {number} radius
+   * @returns {BABYLON.Vector3} 
+   */
+  function Navigate(scene, position, direction, radius) {
+    const navigateDirections = Utils.Vector3.Probes(direction);
+    for (const probe of navigateDirections) {
+      const ray = new Ray(position, probe, radius);
+      const hitInfo = scene.pickWithRay(ray);
+      if (!hitInfo.hit) {
+        return probe;
+      }
+    }
+    
+    return direction.scale(-1);
   }
 
   /**
@@ -297,7 +440,16 @@ function main() {
         force.addInPlace(Physics.Alignment(direction, directionOfFlock));
       }
 
+      if (IsColliding(scene, boid.position, direction, $ENV.boids.collision.range)) {
+        const steerDirection = Navigate(scene, boid.position, direction, $ENV.boids.collision.range);
+        force.addInPlace(Physics.AvoidCollision(direction, steerDirection));
+      }
+
       force.addInPlace(Physics.SanitizePosition(boid.position));
+
+      if (force.length() > $ENV.force.max) {
+        force.normalize().scaleInPlace($ENV.force.max);
+      }
 
       boid.props.velocity.addInPlace(force.scale(deltaTime));
       boid.props.velocity = Utils.Vector3.ClampLength(boid.props.velocity, $ENV.boids.speed.min, $ENV.boids.speed.max);
@@ -317,6 +469,17 @@ function main() {
     const world = World(scene);  
     const light = AmbientLight(scene, Vector3.Up());
     // const attraction = AttractionPoint(scene);
+    const obstacles = [
+      PillarObstacle(scene, new Vector3(-25, 0,  25)),
+      PillarObstacle(scene, new Vector3(-25, 0, -25)),
+      PillarObstacle(scene, new Vector3( 25, 0,  25)),
+      PillarObstacle(scene, new Vector3( 25, 0, -25)),
+
+      TorusObstacle(scene, new Vector3(-32, 5, 0), 15, 4),
+      TorusObstacle(scene, new Vector3( 32, 5, 0), 15, 4),
+
+      ElevatedGroundObstacle(scene),
+    ];
 
     const boidParticleSystem = BoidParticleSystem(scene);
     boidParticleSystem.initParticles();
