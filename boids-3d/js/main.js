@@ -87,6 +87,20 @@ const Utils = {
     },
   },
 
+  Flock: {
+    /**
+     * @param {BABYLON.Vector3} position
+     * @param {BABYLON.Vector3} direction
+     * @param {BABYLON.Vector3} other
+     * @returns {boolean}
+     */
+    IsVisible: function IsVisible(position, direction, other) {
+      const diff = other.subtract(position);
+      const dot = Vector3.Dot(direction, diff.clone().normalize());
+      return diff.length() <= $ENV.boids.flock.range && dot >= Math.cos($ENV.boids.flock.viewport);
+    },
+  },
+
   Rotation: {
     /**
      * @returns {BABYLON.Vector3}
@@ -109,6 +123,7 @@ const Utils = {
       return Vector3.RotationFromAxis(_up, _right, _forward);
     },
   },
+
   Color: {
     /**
      * @param {string} hex
@@ -132,13 +147,13 @@ const $ENV = {
     population: 150,
     speed: { min: 8, max: 12 },
     color: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
-    flock: { range: 8 },
+    flock: { range: 8, viewport: 0.6 * Math.PI },
   },
   force: {
     attraction: { weight: 25 },
-    repulsion: { weight: 13, max: 250 },
-    cohesion: { weight: 10 },
-    alignment: { weight: 3 },
+    repulsion: { weight: 20, max: 250 },
+    cohesion: { weight: 20 },
+    alignment: { weight: 2 },
   },
 };
 
@@ -267,8 +282,7 @@ function main() {
       for (let i = 0; i < sps.nbParticles; i += 1) {
         if (i === boid.idx) { continue; }
 
-        const diff = boid.position.subtract(sps.particles[i].position);
-        if (diff.length() > $ENV.boids.flock.range) { continue; }
+        if (!Utils.Flock.IsVisible(boid.position, direction, sps.particles[i].position)) { continue; }
 
         flockSize += 1;
         centerOfFlock.addInPlace(sps.particles[i].position);
@@ -278,10 +292,11 @@ function main() {
       if (flockSize > 0) {
         centerOfFlock.scaleInPlace(1 / flockSize);
         directionOfFlock.scaleInPlace(1 / flockSize);
+
+        force.addInPlace(Physics.Cohesion(boid.position, centerOfFlock));
+        force.addInPlace(Physics.Alignment(direction, directionOfFlock));
       }
 
-      force.addInPlace(Physics.Cohesion(boid.position, centerOfFlock));
-      force.addInPlace(Physics.Alignment(direction, directionOfFlock));
       force.addInPlace(Physics.SanitizePosition(boid.position));
 
       boid.props.velocity.addInPlace(force.scale(deltaTime));
