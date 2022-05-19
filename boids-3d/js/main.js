@@ -188,19 +188,19 @@ const $ENV = {
     size: { x: 80, y: 30, z: 80 },
   },
   boids: {
-    population: 500,
+    population: 400,
     speed: { min: 12, max: 16 },
     color: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
-    flock: { range: 12, viewport: 0.7 * Math.PI },
+    flock: { range: 12, viewport: .8 * Math.PI },
     collision: { range: 4 },
   },
   force: {
     max: 500,
     attraction: { weight: 50 },
     repulsion: { weight: 40, max: 500 },
-    cohesion: { weight: 10 },
-    alignment: { weight: 10 },
-    avoidCollision: { weight: 400 },
+    cohesion: { weight: 8 },
+    alignment: { weight: 8 },
+    avoidCollision: { weight: 200 },
   },
 };
 
@@ -229,8 +229,7 @@ function main() {
   function World(scene) {
     const world = MeshBuilder.CreateBox('world', { width: $ENV.world.size.x, height: $ENV.world.size.y, depth: $ENV.world.size.z }, scene);
     world.position = $ENV.world.center();
-    world.material = new StandardMaterial('world-mat', scene);
-    world.material.wireframe = true;
+    world.isVisible = false;
     return world;
   }
 
@@ -383,9 +382,9 @@ function main() {
       for (let i = 0; i < sps.nbParticles; i++) {
         const boid = sps.particles[i];
         
-        boid.position.x = Scalar.RandomRange($ENV.world.x.min, $ENV.world.x.max);
-        boid.position.y = Scalar.RandomRange($ENV.world.y.min, $ENV.world.y.max);
-        boid.position.z = Scalar.RandomRange($ENV.world.z.min, $ENV.world.z.max);
+        boid.position.x = Scalar.RandomRange($ENV.world.x.min + 5, $ENV.world.x.max);
+        boid.position.y = Scalar.RandomRange($ENV.world.y.min + 5, $ENV.world.y.max);
+        boid.position.z = Scalar.RandomRange($ENV.world.z.min + 5, $ENV.world.z.max);
         
         const direction = Utils.Rotation.Random();
         const velocity = direction.scale(Scalar.RandomRange($ENV.boids.speed.min, $ENV.boids.speed.max));
