@@ -145,6 +145,14 @@ const Utils = {
 
   Flock: {
     /**
+     * @param {number} index
+     * @returns {string}
+     */
+    Type: function Type(index) {
+      return ['A', 'A', 'A', 'B', 'B', 'C'][index % 6];
+    },
+
+    /**
      * @param {BABYLON.Vector3} position
      * @param {BABYLON.Vector3} direction
      * @param {BABYLON.Vector3} other
@@ -200,9 +208,13 @@ const $ENV = {
     size: { x: 80, y: 30, z: 80 },
   },
   boids: {
-    population: 400,
+    population: 600,
     speed: { min: 12, max: 16 },
-    color: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
+    color: {
+      A: { low: Utils.Color.Hex('6ec6ff'), high: Utils.Color.Hex('0069c0') },
+      B: { low: Utils.Color.Hex('fb8c00'), high: Utils.Color.Hex('ff8a65') },
+      C: { low: Utils.Color.Hex('cddc39'), high: Utils.Color.Hex('aed581') },
+    },
     flock: { range: 12, viewport: .8 * Math.PI },
     collision: { range: 4 },
   },
@@ -417,7 +429,7 @@ function main() {
           velocity,
         };
 
-        boid.color = Color3.Lerp($ENV.boids.color.low, $ENV.boids.color.high, Scalar.RandomRange(0, 1));
+        boid.color = Color3.Lerp($ENV.boids.color[Utils.Flock.Type(i)].low, $ENV.boids.color[Utils.Flock.Type(i)].high, Scalar.RandomRange(0, 1));
       }
     };
 
@@ -445,7 +457,7 @@ function main() {
 
       for (let i = 0; i < sps.nbParticles; i += 1) {
         if (i === boid.idx) { continue; }
-
+        if (Utils.Flock.Type(i) !== Utils.Flock.Type(boid.idx)) { continue; }
         if (!Utils.Flock.IsVisible(boid.position, direction, sps.particles[i].position)) { continue; }
 
         flockSize += 1;
