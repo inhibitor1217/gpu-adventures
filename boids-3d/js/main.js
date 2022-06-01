@@ -81,6 +81,18 @@ const Physics = {
   AvoidCollision: function AvoidCollision(direction, targetDirection) {
     return targetDirection.subtract(direction).normalize().scale($ENV.force.avoidCollision.weight);
   },
+
+  /**
+   * @param {BABYLON.Vector3} p0 
+   * @param {BABYLON.Vector3} p1 
+   * @param {BABYLON.Vector3} p2 
+   * @param {BABYLON.Vector3} direction
+   * @returns {boolean}
+   */
+  IsFrontFacing: function isFrontFacing(p0, p1, p2, direction) {
+    const normal = Vector3.Cross(p1.subtract(p0), p2.subtract(p0));
+    return Vector3.Dot(direction, normal) > 0;
+  },
 };
 
 const Utils = {
@@ -297,19 +309,19 @@ function main() {
    */
   function ElevatedGroundObstacle(scene) {
     const side = [
-      new Vector3($ENV.world.x.min, $ENV.world.y.min    , $ENV.world.z.min),
-      new Vector3($ENV.world.x.max, $ENV.world.y.min    , $ENV.world.z.min),
-      new Vector3($ENV.world.x.max, $ENV.world.y.min + 1, $ENV.world.z.min),
-      new Vector3(              20, $ENV.world.y.min    , $ENV.world.z.min),
-      new Vector3(              10, $ENV.world.y.min + 5, $ENV.world.z.min),
-      new Vector3(             -10, $ENV.world.y.min + 5, $ENV.world.z.min),
-      new Vector3(             -20, $ENV.world.y.min    , $ENV.world.z.min),
-      new Vector3($ENV.world.x.min, $ENV.world.y.min + 1, $ENV.world.z.min),
-      new Vector3($ENV.world.x.min, $ENV.world.y.min    , $ENV.world.z.min),
+      new Vector3($ENV.world.x.min, $ENV.world.y.min - 5, $ENV.world.z.min - 5),
+      new Vector3($ENV.world.x.max, $ENV.world.y.min - 5, $ENV.world.z.min - 5),
+      new Vector3($ENV.world.x.max, $ENV.world.y.min + 1, $ENV.world.z.min - 5),
+      new Vector3(              20, $ENV.world.y.min + 1, $ENV.world.z.min - 5),
+      new Vector3(              10, $ENV.world.y.min + 5, $ENV.world.z.min - 5),
+      new Vector3(             -10, $ENV.world.y.min + 5, $ENV.world.z.min - 5),
+      new Vector3(             -20, $ENV.world.y.min + 1, $ENV.world.z.min - 5),
+      new Vector3($ENV.world.x.min, $ENV.world.y.min + 1, $ENV.world.z.min - 5),
+      new Vector3($ENV.world.x.min, $ENV.world.y.min - 5, $ENV.world.z.min - 5),
     ];
     const extrudePath = [
       new Vector3(0, 0, 0),
-      new Vector3(0, 0, $ENV.world.size.z),
+      new Vector3(0, 0, $ENV.world.size.z + 10),
     ];
     const elevatedGround = MeshBuilder.ExtrudeShape(
       "elevated-ground",
@@ -343,7 +355,12 @@ function main() {
    */
   function IsColliding(scene, position, direction, radius) {
     const ray = new Ray(position, direction, radius);
-    const hitInfo = scene.pickWithRay(ray);
+    const hitInfo = scene.pickWithRay(
+      ray,
+      undefined,
+      undefined,
+      (p0, p1, p2, ray) => Physics.IsFrontFacing(p0, p1, p2, ray.direction),
+    );
     return hitInfo.hit;
   }
 
@@ -358,7 +375,12 @@ function main() {
     const navigateDirections = Utils.Vector3.Probes(direction);
     for (const probe of navigateDirections) {
       const ray = new Ray(position, probe, radius);
-      const hitInfo = scene.pickWithRay(ray);
+      const hitInfo = scene.pickWithRay(
+        ray,
+        undefined,
+        undefined,
+        (p0, p1, p2, ray) => Physics.IsFrontFacing(p0, p1, p2, ray.direction),
+      );
       if (!hitInfo.hit) {
         return probe;
       }
