@@ -1,24 +1,42 @@
 /// <reference path="../../node_modules/babylonjs/babylon.d.ts" />
 
+const {
+  ArcRotateCamera,
+  HemisphericLight,
+  Scene,
+  Vector3,
+  WebGPUEngine,
+} = BABYLON;
+
+const PI = Math.PI;
+
+const Utils = {};
+
+const $ENV = {
+  world: {
+    center: () => Vector3.Zero(),
+  },
+};
+
 async function main() {
   const canvas = document.getElementById('root');
   
-  const engine = new BABYLON.WebGPUEngine(canvas, { preserveDrawingBuffer: true, stencil: true });
+  const engine = new WebGPUEngine(canvas, { preserveDrawingBuffer: true, stencil: true });
   await engine.initAsync();
 
-  function createScene(){
-    const scene = new BABYLON.Scene(engine);
-    const camera = new BABYLON.FreeCamera('camera1', new BABYLON.Vector3(0, 5, -10), scene);
-    camera.setTarget(BABYLON.Vector3.Zero());
+  function createScene() {
+    const scene = new Scene(engine);
+    const camera = new ArcRotateCamera('camera', .25 * PI, .25 * PI, 10, $ENV.world.center(), scene);
+    camera.setTarget(Vector3.Zero());
     camera.attachControl(canvas, false);
-    const light = new BABYLON.HemisphericLight('light1', new BABYLON.Vector3(0, 1, 0), scene);
-    const sphere = BABYLON.MeshBuilder.CreateSphere('sphere1', {segments: 16, diameter: 2, sideOrientation: BABYLON.Mesh.FRONTSIDE}, scene);
-    sphere.position.y = 1;
-    const ground = BABYLON.MeshBuilder.CreateGround("ground1", { width: 6, height: 6, subdivisions: 2, updatable: false }, scene);
+
+    const light = new HemisphericLight('light', Vector3.Up(), scene);
+    
     return scene;
   }
 
   const scene = createScene();
+
   engine.runRenderLoop(function(){
     scene.render();
   });
