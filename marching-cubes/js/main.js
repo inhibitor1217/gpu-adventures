@@ -517,8 +517,6 @@ async function main() {
     ),
   };
 
-  const INDICES_WITH_MAX_VERTICES = Utils.Number.Range(1 << 12);
-
   /**
    * @param {BABYLON.Mesh} mesh 
    * @param {BABYLON.Buffer} buffer
@@ -527,7 +525,7 @@ async function main() {
   function ApplyVertexBuffers(mesh, numVertices) {
     mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.PositionKind, true, undefined, 8, undefined, 0, 3));
     mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.NormalKind, true, undefined, 8, undefined, 4, 3));
-    mesh.setIndices(INDICES_WITH_MAX_VERTICES, numVertices, true);
+    mesh.setIndices(Utils.Number.Range(numVertices));
     return mesh;
   }
 
@@ -544,7 +542,7 @@ async function main() {
     const mesh = new Mesh(name, scene);
     const buffer = new StorageBuffer(engine, Utils.Buffer.Strides.VERTEX * 15 * $ENV.shaders.marchingCubes.computeShaderGrid.total);
 
-    ApplyVertexBuffers(mesh, $ENV.shaders.marchingCubes.workgroupSize.total * 15);
+    ApplyVertexBuffers(mesh, $ENV.shaders.marchingCubes.computeShaderGrid.total * 15);
 
     if (wireframe) {
       const mat = new StandardMaterial(name + '-mat', scene);
