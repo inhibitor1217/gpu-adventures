@@ -2,6 +2,7 @@
 
 const {
   ArcRotateCamera,
+  BoundingInfo,
   Buffer,
   Color3,
   ComputeShader,
@@ -421,14 +422,14 @@ fn density(position: vec3<f32>) -> f32 {
 fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
         @builtin(local_invocation_id) local_invocation_id: vec3<u32>,
         @builtin(local_invocation_index) local_invocation_index: u32) {
-  let offset = global_offset + vec3<f32>(global_invocation_id);
+  let offset = vec3<f32>(global_invocation_id);
 
   /* Calculate the cube case. */
   var cube_densities: array<f32, 8>;
   var cube_case = 0u;
 
   for (var i = 0u; i < NUM_VERTICES_IN_CUBE; i++) {
-    cube_densities[i] = density(cube_offsets[i] + offset);
+    cube_densities[i] = density(cube_offsets[i] + global_offset + offset);
   }
 
   for (var i = 0u; i < NUM_VERTICES_IN_CUBE; i++) {
@@ -525,7 +526,7 @@ async function main() {
   function ApplyVertexBuffers(mesh, numVertices) {
     mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.PositionKind, true, undefined, 8, undefined, 0, 3));
     mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.NormalKind, true, undefined, 8, undefined, 4, 3));
-    mesh.setIndices(Utils.Number.Range(numVertices));
+    mesh.setIndices(Utils.Number.Range(numVertices), numVertices);
     return mesh;
   }
 
@@ -549,7 +550,7 @@ async function main() {
       mat.wireframe = true;
       mesh.material = mat;
     }
-    
+
     return {
       _mesh: mesh,
       _verticesBuffer: buffer,
@@ -586,6 +587,10 @@ async function main() {
     terrain._mesh.getVertexBuffer(VertexBuffer.PositionKind).update(vertices);
     terrain._mesh.getVertexBuffer(VertexBuffer.NormalKind).update(vertices);
 
+    /* Update bounding box of the generated mesh. */
+    terrain._mesh.position = position.clone();
+    terrain._mesh.setBoundingInfo(new BoundingInfo(Vector3.Zero(), new Vector3($ENV.shaders.marchingCubes.computeShaderGrid.x, $ENV.shaders.marchingCubes.computeShaderGrid.y, $ENV.shaders.marchingCubes.computeShaderGrid.z)));
+
     return terrain;
   }
 
@@ -596,7 +601,7 @@ async function main() {
 
     const light = new HemisphericLight('light', Vector3.Up(), scene);
 
-    const terrains = Utils.Number.Range(64).map(i => CreateTerrain(scene, `terrain-${i}`, true));
+    const terrains = Utils.Number.Range(64).map(i => CreateTerrain(scene, `terrain-${i}`));
 
     Shaders.MarchingCubesMesh.setStorageBuffer('edge_cases', Buffers.MarchingCubesEdgeCases);
     Shaders.MarchingCubesMesh.setStorageBuffer('triangle_cases', Buffers.MarchingCubesTriangleCases);
