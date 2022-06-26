@@ -515,6 +515,66 @@ async function main() {
     return mesh;
   }
 
+  /**
+   * @param {BABYLON.Scene} scene
+   * @param {string} name
+   * @param {boolean | undefined} wireframe
+   * @returns {{
+   *  _mesh: BABYLON.Mesh
+   *  _verticesBuffer: BABYLON.StorageBuffer
+   * }}
+   */
+  function CreateTerrain(scene, name, wireframe = false) {
+    const mesh = new Mesh(name, scene);
+    const buffer = new StorageBuffer(engine, Utils.Buffer.Strides.VERTEX * 15 * $ENV.shaders.marchingCubes.computeShaderGrid.total);
+
+    ApplyVertexBuffers(mesh, $ENV.shaders.marchingCubes.workgroupSize.total * 15);
+
+    if (wireframe) {
+      const mat = new StandardMaterial(name + '-mat', scene);
+      mat.wireframe = true;
+      mesh.material = mat;
+    }
+    
+    return {
+      _mesh: mesh,
+      _verticesBuffer: buffer,
+    };
+  }
+
+  /**
+   * @param {{
+   *  _mesh: BABYLON.Mesh
+   *  _verticesBuffer: BABYLON.StorageBuffer
+   * }} terrain 
+   * @param {BABYLON.Vector3} position
+   * @returns {Promise<{
+   *  _mesh: BABYLON.Mesh
+   *  _verticesBuffer: BABYLON.StorageBuffer
+   * }>} 
+   */
+  async function UpdateTerrain(terrain, position) {
+    /* Bind target buffers to shader. */
+    Shaders.MarchingCubesMesh.setStorageBuffer('vertices', terrain._verticesBuffer);
+    Buffers.MarchingCubesGlobalOffset.updateVector3('global_offset', position);
+    Buffers.MarchingCubesGlobalOffset.update();
+
+    /* Run the compute shader. */
+    await Shaders.MarchingCubesMesh
+      .dispatchWhenReady(
+        $ENV.shaders.marchingCubes.numWorkgroups.x,
+        $ENV.shaders.marchingCubes.numWorkgroups.y,
+        $ENV.shaders.marchingCubes.numWorkgroups.z,
+      );
+    
+    /* Read the data back at the CPU side, update vertices buffer */
+    const vertices = new Float32Array((await terrain._verticesBuffer.read()).buffer);
+    terrain._mesh.getVertexBuffer(VertexBuffer.PositionKind).update(vertices);
+    terrain._mesh.getVertexBuffer(VertexBuffer.NormalKind).update(vertices);
+
+    return terrain;
+  }
+
   function createScene() {
     const scene = new Scene(engine);
     const camera = new ArcRotateCamera('camera', .25 * PI, .25 * PI, 10, $ENV.world.center(), scene);
@@ -523,51 +583,17 @@ async function main() {
 
     const light = new HemisphericLight('light', Vector3.Up(), scene);
 
-    const mesh0 = new Mesh('mesh-0', scene);
-    const mesh0Buffer = new StorageBuffer(engine, Utils.Buffer.Strides.VERTEX * 15 * $ENV.shaders.marchingCubes.computeShaderGrid.total);
-
-    const mesh1 = new Mesh('mesh-1', scene);
-    const mesh1Buffer = new StorageBuffer(engine, Utils.Buffer.Strides.VERTEX * 15 * $ENV.shaders.marchingCubes.computeShaderGrid.total);
-
-    const wireframeMat = new StandardMaterial('wireframe-mat', scene);
-    wireframeMat.wireframe = true;
-  
-    mesh0.material = wireframeMat;
-    mesh1.material = wireframeMat;
-    
-    ApplyVertexBuffers(mesh0, $ENV.shaders.marchingCubes.workgroupSize.total * 15);
-    ApplyVertexBuffers(mesh1, $ENV.shaders.marchingCubes.workgroupSize.total * 15);
+    const terrain0 = CreateTerrain(scene, 'terrain-0', true);
+    const terrain1 = CreateTerrain(scene, 'terrain-1', true);
 
     Shaders.MarchingCubesMesh.setStorageBuffer('edge_cases', Buffers.MarchingCubesEdgeCases);
     Shaders.MarchingCubesMesh.setStorageBuffer('triangle_cases', Buffers.MarchingCubesTriangleCases);
     Shaders.MarchingCubesMesh.setUniformBuffer('global_offset', Buffers.MarchingCubesGlobalOffset);
 
-    Shaders.MarchingCubesMesh.setStorageBuffer('vertices', mesh0Buffer);
-    Buffers.MarchingCubesGlobalOffset.updateVector3('global_offset', Vector3.Zero());
-    Buffers.MarchingCubesGlobalOffset.update();
-
-    Shaders.MarchingCubesMesh
-      .dispatchWhenReady($ENV.shaders.marchingCubes.numWorkgroups.x, $ENV.shaders.marchingCubes.numWorkgroups.y, $ENV.shaders.marchingCubes.numWorkgroups.z)
-      .then(() => mesh0Buffer.read())
-      .then(data => new Float32Array(data.buffer))
-      .then(vertices => {
-        mesh0.getVertexBuffer(VertexBuffer.PositionKind).update(vertices);
-        mesh0.getVertexBuffer(VertexBuffer.NormalKind).update(vertices);
-      })
-      .then(() => {
-        Shaders.MarchingCubesMesh.setStorageBuffer('vertices', mesh1Buffer);
-        Buffers.MarchingCubesGlobalOffset.updateVector3('global_offset', new Vector3(0, 4, 0));
-        Buffers.MarchingCubesGlobalOffset.update();
-      })
-      .then(() => Shaders.MarchingCubesMesh
-        .dispatchWhenReady($ENV.shaders.marchingCubes.numWorkgroups.x, $ENV.shaders.marchingCubes.numWorkgroups.y, $ENV.shaders.marchingCubes.numWorkgroups.z)
-        .then(() => mesh1Buffer.read())
-        .then(data => new Float32Array(data.buffer))
-        .then(vertices => {
-          mesh1.getVertexBuffer(VertexBuffer.PositionKind).update(vertices);
-          mesh1.getVertexBuffer(VertexBuffer.NormalKind).update(vertices);
-        }));
-    
+    Promise.resolve()
+      .then(() => UpdateTerrain(terrain0, Vector3.Zero()))
+      .then(() => UpdateTerrain(terrain1, new Vector3(0, 4, 0)));
+ 
     return scene;
   }
 
