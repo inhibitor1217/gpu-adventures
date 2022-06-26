@@ -325,11 +325,14 @@ const Utils = {
       return ret;
     },
   },
+  Task: {
+    Chain: tasks => tasks.reduce((task, next) => task.then(next), Promise.resolve()),
+  },
 };
 
 const $ENV = {
   world: {
-    center: () => Vector3.Zero(),
+    center: () => new Vector3(16, 8, 16),
   },
   shaders: {
     marchingCubes: {
@@ -411,7 +414,7 @@ var<private> NUM_EDGES_IN_CUBE: u32 = 12u;
 var<private> TRIANGLE_CASE_OFFSET: u32 = 16u;
 
 fn density(position: vec3<f32>) -> f32 {
-  return 4.0 - length(position - vec3<f32>(4, 4, 4));
+  return 8.0 - length(position - vec3<f32>(16, 8, 16));
 }
 
 @compute @workgroup_size(${$ENV.shaders.marchingCubes.workgroupSize.x}, ${$ENV.shaders.marchingCubes.workgroupSize.y}, ${$ENV.shaders.marchingCubes.workgroupSize.z})
@@ -458,12 +461,25 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
     global_invocation_id.z * (${$ENV.shaders.marchingCubes.computeShaderGrid.x * $ENV.shaders.marchingCubes.computeShaderGrid.y})
   ) * MAX_VERTICES_PER_VOXEL;
 
-  for (var i = 0u; i < MAX_VERTICES_PER_VOXEL; i++) {
-    let idx = triangle_cases[cube_case * TRIANGLE_CASE_OFFSET + i];
-    if (idx < 0) { break; }
+  for (var i = 0u; i < MAX_VERTICES_PER_VOXEL; i += 3u) {
+    let idx0 = triangle_cases[cube_case * TRIANGLE_CASE_OFFSET + i];
+    if (idx0 < 0) { break; }
+    let idx1 = triangle_cases[cube_case * TRIANGLE_CASE_OFFSET + i + 1u];
+    let idx2 = triangle_cases[cube_case * TRIANGLE_CASE_OFFSET + i + 2u];
 
-    vertices[index_offset + i].position = edge_vertices[idx];
-    vertices[index_offset + i].normal = vec3<f32>(0, 1, 0);
+    let pos0 = edge_vertices[idx0];
+    let pos1 = edge_vertices[idx1];
+    let pos2 = edge_vertices[idx2];
+
+    let normal = normalize(cross(pos2 - pos0, pos1 - pos0));
+
+    vertices[index_offset + i].position = pos0;
+    vertices[index_offset + i + 1u].position = pos1;
+    vertices[index_offset + i + 2u].position = pos2;
+
+    vertices[index_offset + i].normal = normal;
+    vertices[index_offset + i + 1u].normal = normal;
+    vertices[index_offset + i + 2u].normal = normal;
   }
 }
 
@@ -577,22 +593,28 @@ async function main() {
 
   function createScene() {
     const scene = new Scene(engine);
-    const camera = new ArcRotateCamera('camera', .25 * PI, .25 * PI, 10, $ENV.world.center(), scene);
-    camera.setTarget(Vector3.Zero());
+    const camera = new ArcRotateCamera('camera', .25 * PI, .25 * PI, 32, $ENV.world.center(), scene);
     camera.attachControl(canvas, false);
 
     const light = new HemisphericLight('light', Vector3.Up(), scene);
 
-    const terrain0 = CreateTerrain(scene, 'terrain-0', true);
-    const terrain1 = CreateTerrain(scene, 'terrain-1', true);
+    const terrains = Utils.Number.Range(64).map(i => CreateTerrain(scene, `terrain-${i}`, true));
 
     Shaders.MarchingCubesMesh.setStorageBuffer('edge_cases', Buffers.MarchingCubesEdgeCases);
     Shaders.MarchingCubesMesh.setStorageBuffer('triangle_cases', Buffers.MarchingCubesTriangleCases);
     Shaders.MarchingCubesMesh.setUniformBuffer('global_offset', Buffers.MarchingCubesGlobalOffset);
 
-    Promise.resolve()
-      .then(() => UpdateTerrain(terrain0, Vector3.Zero()))
-      .then(() => UpdateTerrain(terrain1, new Vector3(0, 4, 0)));
+    Utils.Task.Chain(
+      terrains.map((terrain, i) =>
+        () => UpdateTerrain(
+          terrain,
+          new Vector3(
+            (Math.floor(i / 16) % 4) * $ENV.shaders.marchingCubes.computeShaderGrid.x,
+            (Math.floor(i / 4) % 4) * $ENV.shaders.marchingCubes.computeShaderGrid.y,
+            (i % 4) * $ENV.shaders.marchingCubes.computeShaderGrid.z,
+          ),
+      )),
+  );
  
     return scene;
   }
