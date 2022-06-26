@@ -10,6 +10,7 @@ const {
   Scene,
   StandardMaterial,
   StorageBuffer,
+  UniformBuffer,
   Vector3,
   VertexBuffer,
   VertexData,
@@ -336,11 +337,24 @@ const $ENV = {
         x: 4,
         y: 4,
         z: 4,
-        gridSize: 64,
+      },
+      numWorkgroups: {
+        x: 2,
+        y: 1,
+        z: 2,
       },
     },
   },
 };
+
+$ENV.shaders.marchingCubes.workgroupSize.total = $ENV.shaders.marchingCubes.workgroupSize.x * $ENV.shaders.marchingCubes.workgroupSize.y * $ENV.shaders.marchingCubes.workgroupSize.z;
+$ENV.shaders.marchingCubes.numWorkgroups.total = $ENV.shaders.marchingCubes.numWorkgroups.x * $ENV.shaders.marchingCubes.numWorkgroups.y * $ENV.shaders.marchingCubes.numWorkgroups.z;
+
+$ENV.shaders.marchingCubes.computeShaderGrid = {};
+$ENV.shaders.marchingCubes.computeShaderGrid.x = $ENV.shaders.marchingCubes.workgroupSize.x * $ENV.shaders.marchingCubes.numWorkgroups.x;
+$ENV.shaders.marchingCubes.computeShaderGrid.y = $ENV.shaders.marchingCubes.workgroupSize.y * $ENV.shaders.marchingCubes.numWorkgroups.y;
+$ENV.shaders.marchingCubes.computeShaderGrid.z = $ENV.shaders.marchingCubes.workgroupSize.z * $ENV.shaders.marchingCubes.numWorkgroups.z;
+$ENV.shaders.marchingCubes.computeShaderGrid.total = $ENV.shaders.marchingCubes.computeShaderGrid.x * $ENV.shaders.marchingCubes.computeShaderGrid.y * $ENV.shaders.marchingCubes.computeShaderGrid.z;
 
 const SHADER_SOURCES = {
   'Compute:MarchingCubesMesh': `
@@ -358,6 +372,9 @@ var<storage, read> edge_cases: array<u32, 256>;
 
 @group(0) @binding(2)
 var<storage, read> triangle_cases: array<i32, 4096>;
+
+@group(1) @binding(0)
+var<uniform> global_offset: vec3<f32>;
 
 var<private> cube_offsets: array<vec3<f32>, 8> = array<vec3<f32>, 8>(
   vec3<f32>(0, 0, 0),
@@ -394,13 +411,14 @@ var<private> NUM_EDGES_IN_CUBE: u32 = 12u;
 var<private> TRIANGLE_CASE_OFFSET: u32 = 16u;
 
 fn density(position: vec3<f32>) -> f32 {
-  return 0.5 - position.y;
+  return 4.0 - length(position - vec3<f32>(4, 4, 4));
 }
 
 @compute @workgroup_size(${$ENV.shaders.marchingCubes.workgroupSize.x}, ${$ENV.shaders.marchingCubes.workgroupSize.y}, ${$ENV.shaders.marchingCubes.workgroupSize.z})
-fn main(@builtin(local_invocation_id) local_invocation_id: vec3<u32>,
+fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
+        @builtin(local_invocation_id) local_invocation_id: vec3<u32>,
         @builtin(local_invocation_index) local_invocation_index: u32) {
-  let offset: vec3<f32> = vec3<f32>(local_invocation_id);
+  let offset = global_offset + vec3<f32>(global_invocation_id);
 
   /* Calculate the cube case. */
   var cube_densities: array<f32, 8>;
@@ -434,12 +452,18 @@ fn main(@builtin(local_invocation_id) local_invocation_id: vec3<u32>,
   }
 
   /* Fill the vertices storage buffer. */
+  let index_offset = (
+    global_invocation_id.x +
+    global_invocation_id.y * (${$ENV.shaders.marchingCubes.computeShaderGrid.x}) +
+    global_invocation_id.z * (${$ENV.shaders.marchingCubes.computeShaderGrid.x * $ENV.shaders.marchingCubes.computeShaderGrid.y})
+  ) * MAX_VERTICES_PER_VOXEL;
+
   for (var i = 0u; i < MAX_VERTICES_PER_VOXEL; i++) {
     let idx = triangle_cases[cube_case * TRIANGLE_CASE_OFFSET + i];
     if (idx < 0) { break; }
 
-    vertices[MAX_VERTICES_PER_VOXEL * local_invocation_index + i].position = edge_vertices[idx];
-    vertices[MAX_VERTICES_PER_VOXEL * local_invocation_index + i].normal = vec3<f32>(0, 1, 0);
+    vertices[index_offset + i].position = edge_vertices[idx];
+    vertices[index_offset + i].normal = vec3<f32>(0, 1, 0);
   }
 }
 
@@ -453,10 +477,9 @@ async function main() {
   await engine.initAsync();
 
   const Buffers = {
-    MarchingCubesVertices: new StorageBuffer(engine, Utils.Buffer.Strides.VERTEX * $ENV.shaders.marchingCubes.workgroupSize.gridSize * 15),
-    
     MarchingCubesEdgeCases: new StorageBuffer(engine, Utils.Buffer.Strides.UINT32 * 256),
     MarchingCubesTriangleCases: new StorageBuffer(engine, Utils.Buffer.Strides.INT32 * 4096),
+    MarchingCubesGlobalOffset: new UniformBuffer(engine),
   };
 
   Buffers.MarchingCubesEdgeCases.update(EDGE_CASES);
@@ -470,8 +493,9 @@ async function main() {
       {
         bindingsMapping: {
           vertices: { group: 0, binding: 0 },
-          edge_cases: { group: 0, binding: 1},
-          triangle_cases: { group: 0, binding: 2},
+          edge_cases: { group: 0, binding: 1 },
+          triangle_cases: { group: 0, binding: 2 },
+          global_offset: { group: 1, binding: 0 },
         },
       },
     ),
@@ -499,25 +523,50 @@ async function main() {
 
     const light = new HemisphericLight('light', Vector3.Up(), scene);
 
-    const mesh = new Mesh('mesh', scene);
+    const mesh0 = new Mesh('mesh-0', scene);
+    const mesh0Buffer = new StorageBuffer(engine, Utils.Buffer.Strides.VERTEX * 15 * $ENV.shaders.marchingCubes.computeShaderGrid.total);
+
+    const mesh1 = new Mesh('mesh-1', scene);
+    const mesh1Buffer = new StorageBuffer(engine, Utils.Buffer.Strides.VERTEX * 15 * $ENV.shaders.marchingCubes.computeShaderGrid.total);
+
     const wireframeMat = new StandardMaterial('wireframe-mat', scene);
     wireframeMat.wireframe = true;
-    mesh.material = wireframeMat;
   
-    ApplyVertexBuffers(mesh, $ENV.shaders.marchingCubes.workgroupSize.gridSize * 15);
+    mesh0.material = wireframeMat;
+    mesh1.material = wireframeMat;
+    
+    ApplyVertexBuffers(mesh0, $ENV.shaders.marchingCubes.workgroupSize.total * 15);
+    ApplyVertexBuffers(mesh1, $ENV.shaders.marchingCubes.workgroupSize.total * 15);
 
-    Shaders.MarchingCubesMesh.setStorageBuffer('vertices', Buffers.MarchingCubesVertices);
     Shaders.MarchingCubesMesh.setStorageBuffer('edge_cases', Buffers.MarchingCubesEdgeCases);
     Shaders.MarchingCubesMesh.setStorageBuffer('triangle_cases', Buffers.MarchingCubesTriangleCases);
+    Shaders.MarchingCubesMesh.setUniformBuffer('global_offset', Buffers.MarchingCubesGlobalOffset);
+
+    Shaders.MarchingCubesMesh.setStorageBuffer('vertices', mesh0Buffer);
+    Buffers.MarchingCubesGlobalOffset.updateVector3('global_offset', Vector3.Zero());
+    Buffers.MarchingCubesGlobalOffset.update();
 
     Shaders.MarchingCubesMesh
-      .dispatchWhenReady(1, 1, 1)
-      .then(() => Buffers.MarchingCubesVertices.read())
+      .dispatchWhenReady($ENV.shaders.marchingCubes.numWorkgroups.x, $ENV.shaders.marchingCubes.numWorkgroups.y, $ENV.shaders.marchingCubes.numWorkgroups.z)
+      .then(() => mesh0Buffer.read())
       .then(data => new Float32Array(data.buffer))
       .then(vertices => {
-        mesh.getVertexBuffer(VertexBuffer.PositionKind).update(vertices);
-        mesh.getVertexBuffer(VertexBuffer.NormalKind).update(vertices);
-      });
+        mesh0.getVertexBuffer(VertexBuffer.PositionKind).update(vertices);
+        mesh0.getVertexBuffer(VertexBuffer.NormalKind).update(vertices);
+      })
+      .then(() => {
+        Shaders.MarchingCubesMesh.setStorageBuffer('vertices', mesh1Buffer);
+        Buffers.MarchingCubesGlobalOffset.updateVector3('global_offset', new Vector3(0, 4, 0));
+        Buffers.MarchingCubesGlobalOffset.update();
+      })
+      .then(() => Shaders.MarchingCubesMesh
+        .dispatchWhenReady($ENV.shaders.marchingCubes.numWorkgroups.x, $ENV.shaders.marchingCubes.numWorkgroups.y, $ENV.shaders.marchingCubes.numWorkgroups.z)
+        .then(() => mesh1Buffer.read())
+        .then(data => new Float32Array(data.buffer))
+        .then(vertices => {
+          mesh1.getVertexBuffer(VertexBuffer.PositionKind).update(vertices);
+          mesh1.getVertexBuffer(VertexBuffer.NormalKind).update(vertices);
+        }));
     
     return scene;
   }
