@@ -447,10 +447,12 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
   var edge_vertices: array<vec3<f32>, 12>;
   for (var i = 0u; i < NUM_EDGES_IN_CUBE; i++) {
     if ((edge_case & (1u << i)) != 0u) {
+      let v0 = edge_vertex_indices[i].x;
+      let v1 = edge_vertex_indices[i].y;
       edge_vertices[i] = offset + mix(
-        cube_offsets[edge_vertex_indices[i].x],
-        cube_offsets[edge_vertex_indices[i].y],
-        0.5f,
+        cube_offsets[v0],
+        cube_offsets[v1],
+        cube_densities[v0] / (cube_densities[v0] - cube_densities[v1]),
       );
     }
   }
