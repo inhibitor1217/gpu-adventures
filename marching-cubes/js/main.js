@@ -8,7 +8,11 @@ const {
   ComputeShader,
   HemisphericLight,
   Mesh,
+  MeshBuilder,
   Scene,
+  ShaderLanguage,
+  ShaderMaterial,
+  ShaderStore,
   StandardMaterial,
   StorageBuffer,
   UniformBuffer,
@@ -360,9 +364,101 @@ $ENV.shaders.marchingCubes.computeShaderGrid.y = $ENV.shaders.marchingCubes.work
 $ENV.shaders.marchingCubes.computeShaderGrid.z = $ENV.shaders.marchingCubes.workgroupSize.z * $ENV.shaders.marchingCubes.numWorkgroups.z;
 $ENV.shaders.marchingCubes.computeShaderGrid.total = $ENV.shaders.marchingCubes.computeShaderGrid.x * $ENV.shaders.marchingCubes.computeShaderGrid.y * $ENV.shaders.marchingCubes.computeShaderGrid.z;
 
+const SHADER_LIBS = {
+  /**
+   * @note
+   * Original work from https://github.com/keijiro/NoiseShader
+   * 
+   * Ported to WGSL by inhibitor1217.
+   */
+  'Lib:Noise': `
+
+fn mod289_3d(x: vec3<f32>) -> vec3<f32> {
+  return x - floor(x / 289) * 289;
+}
+
+fn mod289_4d(x: vec4<f32>) -> vec4<f32> {
+  return x - floor(x / 289) * 289;
+}
+
+fn mod49_4d(x: vec4<f32>) -> vec4<f32> {
+  return x - floor(x / 49) * 49;
+}
+
+fn permute(x: vec4<f32>) -> vec4<f32> {
+  return mod289_4d((x * 34 + 1) * x);
+}
+
+// - Gradient on xyz components
+// - Noise value on w component
+fn snoise(v: vec3<f32>) -> vec4<f32> {
+  let C = vec2<f32>(1.0 / 6.0, 1.0 / 3.0);
+  let ZERO = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+
+  // First corner
+  var i  = floor(v + dot(v, C.yyy));
+  let x0 = v   - i + dot(i, C.xxx);
+
+  // Other corners
+  let g = step(x0.yzx, x0.xyz);
+  let l = 1.0 - g;
+  let i1 = min(g.xyz, l.zxy);
+  let i2 = max(g.xyz, l.zxy);
+
+  let x1 = x0 - i1 + C.x;
+  let x2 = x0 - i2 + C.y;
+  let x3 = x0 - 0.5;
+
+  // Permutations
+  i = mod289_3d(i); // Avoid truncation effects in permutation
+  var p = permute(    i.z + vec4<f32>(0, i1.z, i2.z, 1));
+      p = permute(p + i.y + vec4<f32>(0, i1.y, i2.y, 1));
+      p = permute(p + i.x + vec4<f32>(0, i1.x, i2.x, 1));
+
+  // Gradients: 7x7 points over a square, mapped onto an octahedron.
+  // The ring size 17*17 = 289 is close to a multiple of 49 (49*6 = 294)
+  let j = mod49_4d(p);
+
+  let gx = (floor(j / 7.0) * 2.0 + 0.5) / 7.0 - 1.0;
+  let gy = (floor(j - 7.0 * floor(j / 7.0)) * 2.0 + 0.5) / 7.0 - 1.0;
+  let gz = 1.0 - abs(gx) - abs(gy);
+
+  let b0 = vec4<f32>(gx.xy, gy.xy);
+  let b1 = vec4<f32>(gx.zw, gy.zw);
+
+  let s0 = floor(b0) * 2.0 + 1.0;
+  let s1 = floor(b1) * 2.0 + 1.0;
+  let sh = -step(gz, ZERO);
+
+  let a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+  let a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+  let g0 = normalize(vec3<f32>(a0.xy, gz.x));
+  let g1 = normalize(vec3<f32>(a0.zw, gz.y));
+  let g2 = normalize(vec3<f32>(a1.xy, gz.z));
+  let g3 = normalize(vec3<f32>(a1.zw, gz.w));
+
+  // Mix final noise value
+  let m = max(0.5 - vec4<f32>(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), ZERO);
+  let px = vec4<f32>(dot(x0, g0), dot(x1, g1), dot(x2, g2), dot(x3, g3));
+
+  let m3 = m * m * m;
+  let m4 = m3 * m;
+
+  let temp = -8 * m3 * px;
+  let grad = m4.x * g0 + temp.x * x0 +
+             m4.y * g1 + temp.y * x1 +
+             m4.z * g2 + temp.z * x2 +
+             m4.w * g3 + temp.w * x3;
+
+  return 107.0 * vec4<f32>(grad, dot(m4, px));
+}
+
+  `,
+};
+
 const SHADER_SOURCES = {
   'Compute:MarchingCubesMesh': `
-
 struct Vertex {
   position: vec3<f32>,
   normal: vec3<f32>,
@@ -414,8 +510,11 @@ var<private> NUM_VERTICES_IN_CUBE: u32 = 8u;
 var<private> NUM_EDGES_IN_CUBE: u32 = 12u;
 var<private> TRIANGLE_CASE_OFFSET: u32 = 16u;
 
-fn density(position: vec3<f32>) -> f32 {
-  return 8.0 - length(position - vec3<f32>(16, 8, 16));
+${SHADER_LIBS['Lib:Noise']}
+
+fn density(position: vec3<f32>) -> vec4<f32> {
+  let sample = 8 * snoise(.125 * position);
+  return vec4<f32>(vec3<f32>(0, -1, 0) + sample.xyz, 8.0 - position.y + sample.w);
 }
 
 @compute @workgroup_size(${$ENV.shaders.marchingCubes.workgroupSize.x}, ${$ENV.shaders.marchingCubes.workgroupSize.y}, ${$ENV.shaders.marchingCubes.workgroupSize.z})
@@ -425,7 +524,7 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
   let offset = vec3<f32>(global_invocation_id);
 
   /* Calculate the cube case. */
-  var cube_densities: array<f32, 8>;
+  var cube_densities: array<vec4<f32>, 8>;
   var cube_case = 0u;
 
   for (var i = 0u; i < NUM_VERTICES_IN_CUBE; i++) {
@@ -433,7 +532,7 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
   }
 
   for (var i = 0u; i < NUM_VERTICES_IN_CUBE; i++) {
-    cube_case |= u32(cube_densities[i] > 0.0) << i;
+    cube_case |= u32(cube_densities[i].w > 0.0) << i;
   }
 
   /* This (an empty or fully filled cube) will be the case for most voxels. */
@@ -445,15 +544,16 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
   /* Calculate the vertex positions in edges of the cube. */
   let edge_case = edge_cases[cube_case];
   var edge_vertices: array<vec3<f32>, 12>;
+  var edge_normals: array<vec3<f32>, 12>;
+
   for (var i = 0u; i < NUM_EDGES_IN_CUBE; i++) {
     if ((edge_case & (1u << i)) != 0u) {
       let v0 = edge_vertex_indices[i].x;
       let v1 = edge_vertex_indices[i].y;
-      edge_vertices[i] = offset + mix(
-        cube_offsets[v0],
-        cube_offsets[v1],
-        cube_densities[v0] / (cube_densities[v0] - cube_densities[v1]),
-      );
+      let weight = cube_densities[v0].w / (cube_densities[v0].w - cube_densities[v1].w);
+
+      edge_vertices[i] = offset + mix(cube_offsets[v0], cube_offsets[v1], weight);
+      edge_normals[i]  = normalize(-mix(cube_densities[v0].xyz, cube_densities[v1].xyz, weight));
     }
   }
 
@@ -480,13 +580,41 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
     vertices[index_offset + i + 1u].position = pos1;
     vertices[index_offset + i + 2u].position = pos2;
 
-    vertices[index_offset + i].normal = normal;
-    vertices[index_offset + i + 1u].normal = normal;
-    vertices[index_offset + i + 2u].normal = normal;
+    vertices[index_offset + i     ].normal = edge_normals[idx0];
+    vertices[index_offset + i + 1u].normal = edge_normals[idx1];
+    vertices[index_offset + i + 2u].normal = edge_normals[idx2];
   }
 }
 
   `,
+
+  'Vertex:SimplexNoiseMat': `
+
+#include<sceneUboDeclaration>
+#include<meshUboDeclaration>
+
+attribute position: vec3<f32>;
+
+varying vPosition: vec3<f32>;
+
+@stage(vertex)
+fn main(input: VertexInputs) -> FragmentInputs {
+  gl_Position = scene.viewProjection * mesh.world * vec4<f32>(position, 1.0);
+  vPosition = 32.0 * position;
+}
+
+`,
+  'Fragment:SimplexNoiseMat': `
+
+${SHADER_LIBS['Lib:Noise']}
+
+@stage(fragment)
+fn main(input: FragmentInputs) -> FragmentOutputs {
+  let out = snoise(vPosition).w;
+  gl_FragColor = vec4<f32>((out * 0.5 + 0.5) * vec3<f32>(1.0, 1.0, 1.0), 1.0);
+}
+
+`,
 }
 
 async function main() {
@@ -494,6 +622,9 @@ async function main() {
   
   const engine = new WebGPUEngine(canvas, { preserveDrawingBuffer: true, stencil: true });
   await engine.initAsync();
+
+  ShaderStore.ShadersStoreWGSL['SimplexNoiseMatVertexShader'] = SHADER_SOURCES['Vertex:SimplexNoiseMat'];
+  ShaderStore.ShadersStoreWGSL['SimplexNoiseMatFragmentShader'] = SHADER_SOURCES['Fragment:SimplexNoiseMat'];
 
   const Buffers = {
     MarchingCubesEdgeCases: new StorageBuffer(engine, Utils.Buffer.Strides.UINT32 * 256),
@@ -596,9 +727,32 @@ async function main() {
     return terrain;
   }
 
+  /**
+   * @param {BABYLON.Scene} scene
+   * @param {string} name
+   * @returns {BABYLON.Material} 
+   */
+  function CreateSimplexNoiseMat(scene, name) {
+    const mat = new ShaderMaterial(
+      name,
+      scene,
+      {
+        vertex: 'SimplexNoiseMat',
+        fragment: 'SimplexNoiseMat',
+      },
+      {
+        attributes: ['position'],
+        uniformBuffers: ['Scene', 'Mesh'],
+        shaderLanguage: ShaderLanguage.WGSL,
+      },
+    );
+
+    return mat;
+  }
+
   function createScene() {
     const scene = new Scene(engine);
-    const camera = new ArcRotateCamera('camera', .25 * PI, .25 * PI, 32, $ENV.world.center(), scene);
+    const camera = new ArcRotateCamera('camera', 0.25 * PI, 0.25 * PI, 32, $ENV.world.center(), scene);
     camera.attachControl(canvas, false);
 
     const light = new HemisphericLight('light', Vector3.Up(), scene);
@@ -619,8 +773,8 @@ async function main() {
             (i % 4) * $ENV.shaders.marchingCubes.computeShaderGrid.z,
           ),
       )),
-  );
- 
+    );
+
     return scene;
   }
 
