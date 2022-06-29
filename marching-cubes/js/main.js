@@ -9,12 +9,15 @@ const {
   HemisphericLight,
   Mesh,
   MeshBuilder,
+  RawTexture,
   Scene,
   ShaderLanguage,
   ShaderMaterial,
   ShaderStore,
   StandardMaterial,
   StorageBuffer,
+  Texture,
+  TextureSampler,
   UniformBuffer,
   Vector3,
   VertexBuffer,
@@ -461,7 +464,7 @@ const SHADER_SOURCES = {
 struct Vertex {
   position: vec3<f32>,
   normal: vec3<f32>,
-  color: vec3<f32>
+  color: vec4<f32>
 };
 
 @group(0) @binding(0)
@@ -472,6 +475,12 @@ var<storage, read> edge_cases: array<u32, 256>;
 
 @group(0) @binding(2)
 var<storage, read> triangle_cases: array<i32, 4096>;
+
+@group(0) @binding(3)
+var color_map_samp: sampler;
+
+@group(0) @binding(4)
+var color_map_tex: texture_2d<f32>;
 
 @group(1) @binding(0)
 var<uniform> global_offset: vec3<f32>;
@@ -596,6 +605,8 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
     global_invocation_id.z * (${$ENV.shaders.marchingCubes.computeShaderGrid.x * $ENV.shaders.marchingCubes.computeShaderGrid.y})
   ) * MAX_VERTICES_PER_VOXEL;
 
+  let color_map_dims = vec2<f32>(textureDimensions(color_map_tex, 0));
+
   for (var i = 0u; i < MAX_VERTICES_PER_VOXEL; i += 3u) {
     let idx0 = triangle_cases[cube_case * TRIANGLE_CASE_OFFSET + i];
     if (idx0 < 0) { break; }
@@ -621,6 +632,10 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
     vertices[index_offset + i     ].normal = normal;
     vertices[index_offset + i + 1u].normal = normal;
     vertices[index_offset + i + 2u].normal = normal;
+
+    vertices[index_offset + i     ].color = textureSampleLevel(color_map_tex, color_map_samp, vec2<f32>(global_offset.y + pos0.y, 0) / WORLD_MAX.y, 0);
+    vertices[index_offset + i + 1u].color = textureSampleLevel(color_map_tex, color_map_samp, vec2<f32>(global_offset.y + pos1.y, 0) / WORLD_MAX.y, 0);
+    vertices[index_offset + i + 2u].color = textureSampleLevel(color_map_tex, color_map_samp, vec2<f32>(global_offset.y + pos2.y, 0) / WORLD_MAX.y, 0);
   }
 }
 
@@ -683,6 +698,8 @@ async function main() {
           vertices: { group: 0, binding: 0 },
           edge_cases: { group: 0, binding: 1 },
           triangle_cases: { group: 0, binding: 2 },
+          color_map_samp: { group: 0, binding: 3 },
+          color_map_tex: { group: 0, binding: 4 },
           global_offset: { group: 1, binding: 0 },
         },
       },
@@ -697,7 +714,7 @@ async function main() {
   function ApplyVertexBuffers(mesh, numVertices) {
     mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.PositionKind, true, undefined, 12, undefined, 0, 3));
     mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.NormalKind, true, undefined, 12, undefined, 4, 3));
-    mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.ColorKind, true, undefined, 12, undefined, 8, 3));
+    mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.ColorKind, true, undefined, 12, undefined, 8, 4));
     mesh.setIndices(Utils.Number.Range(numVertices), numVertices);
     return mesh;
   }
@@ -720,6 +737,10 @@ async function main() {
     if (wireframe) {
       const mat = new StandardMaterial(name + '-mat', scene);
       mat.wireframe = true;
+      mesh.material = mat;
+    } else {
+      const mat = new StandardMaterial(name + '-mat', scene);
+      mat.specularColor = Color3.Black();
       mesh.material = mat;
     }
 
@@ -790,6 +811,39 @@ async function main() {
     return mat;
   }
 
+  /**
+   * @param {BABYLON.Scene} scene
+   * @returns {{
+   *  tex: BABYLON.Texture
+   *  samp: BABYLON.TextureSampler
+   * }} 
+   */
+  function CreateHeightColorMapTexture(scene) {
+    const tex = RawTexture.CreateRGBATexture(
+      new Uint8Array([
+        0x0d, 0x47, 0xa1, 0xff, // #0d47a1
+        0x1a, 0x23, 0x7e, 0xff, // #1a237e
+        0x7b, 0x1f, 0xa2, 0xff, // #7b1fa2
+        0xf4, 0x43, 0x36, 0xff, // #f44336
+        0xff, 0x98, 0x00, 0xff, // #ff9800
+        0xff, 0xc1, 0x07, 0xff, // #ffc107
+        0xff, 0xee, 0x58, 0xff, // #ffee58
+        0xff, 0xf5, 0x9d, 0xff, // #fff59d
+      ]),
+      8,
+      1,
+      scene,
+      false,
+    );
+
+    const samp = new TextureSampler()
+      .setParameters(
+        Texture.CLAMP_ADDRESSMODE, // wrapU
+      );
+
+    return { tex, samp };
+  }
+
   function createScene() {
     const scene = new Scene(engine);
     const camera = new ArcRotateCamera('camera', 0.25 * PI, 0.25 * PI, 32, $ENV.world.center(), scene);
@@ -798,9 +852,12 @@ async function main() {
     const light = new HemisphericLight('light', Vector3.Up(), scene);
 
     const terrains = Utils.Number.Range(512).map(i => CreateTerrain(scene, `terrain-${i}`));
+    const { tex: terrainColorMapTex, samp: terrainColorMapSamp } = CreateHeightColorMapTexture(scene);
 
     Shaders.MarchingCubesMesh.setStorageBuffer('edge_cases', Buffers.MarchingCubesEdgeCases);
     Shaders.MarchingCubesMesh.setStorageBuffer('triangle_cases', Buffers.MarchingCubesTriangleCases);
+    Shaders.MarchingCubesMesh.setTextureSampler('color_map_samp', terrainColorMapSamp);
+    Shaders.MarchingCubesMesh.setTexture('color_map_tex', terrainColorMapTex, false);
     Shaders.MarchingCubesMesh.setUniformBuffer('global_offset', Buffers.MarchingCubesGlobalOffset);
 
     Utils.Task.Chain(
