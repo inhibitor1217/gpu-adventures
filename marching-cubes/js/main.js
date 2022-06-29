@@ -307,8 +307,7 @@ const Utils = {
     Strides: {
       INT32: 4,
       UINT32: 4,
-      VERTEX: 32,
-      VEC3_F32: 16,
+      VERTEX: 48,
     },
   },
   Number: {
@@ -462,6 +461,7 @@ const SHADER_SOURCES = {
 struct Vertex {
   position: vec3<f32>,
   normal: vec3<f32>,
+  color: vec3<f32>
 };
 
 @group(0) @binding(0)
@@ -695,8 +695,9 @@ async function main() {
    * @returns {BABYLON.Mesh}
    */
   function ApplyVertexBuffers(mesh, numVertices) {
-    mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.PositionKind, true, undefined, 8, undefined, 0, 3));
-    mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.NormalKind, true, undefined, 8, undefined, 4, 3));
+    mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.PositionKind, true, undefined, 12, undefined, 0, 3));
+    mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.NormalKind, true, undefined, 12, undefined, 4, 3));
+    mesh.setVerticesBuffer(new VertexBuffer(engine, new Float32Array(Utils.Buffer.Strides.VERTEX * numVertices), VertexBuffer.ColorKind, true, undefined, 12, undefined, 8, 3));
     mesh.setIndices(Utils.Number.Range(numVertices), numVertices);
     return mesh;
   }
@@ -757,6 +758,7 @@ async function main() {
     const vertices = new Float32Array((await terrain._verticesBuffer.read()).buffer);
     terrain._mesh.getVertexBuffer(VertexBuffer.PositionKind).update(vertices);
     terrain._mesh.getVertexBuffer(VertexBuffer.NormalKind).update(vertices);
+    terrain._mesh.getVertexBuffer(VertexBuffer.ColorKind).update(vertices);
 
     /* Update bounding box of the generated mesh. */
     terrain._mesh.position = position.clone();
