@@ -612,9 +612,15 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>,
     vertices[index_offset + i + 1u].position = pos1;
     vertices[index_offset + i + 2u].position = pos2;
 
-    vertices[index_offset + i     ].normal = edge_normals[idx0];
-    vertices[index_offset + i + 1u].normal = edge_normals[idx1];
-    vertices[index_offset + i + 2u].normal = edge_normals[idx2];
+    /* Use smooth normals */
+    // vertices[index_offset + i     ].normal = edge_normals[idx0];
+    // vertices[index_offset + i + 1u].normal = edge_normals[idx1];
+    // vertices[index_offset + i + 2u].normal = edge_normals[idx2];
+
+    /* Use flat normals */
+    vertices[index_offset + i     ].normal = normal;
+    vertices[index_offset + i + 1u].normal = normal;
+    vertices[index_offset + i + 2u].normal = normal;
   }
 }
 
