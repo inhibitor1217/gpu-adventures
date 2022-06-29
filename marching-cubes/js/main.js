@@ -520,11 +520,21 @@ var<private> octaves: array<vec2<f32>, 4> = array<vec2<f32>, 4>(
   vec2<f32>(8, 0.125),
 );
 
+var<private> WORLD_MIN   : vec3<f32> = vec3<f32>(0, 0, 0);
+var<private> WORLD_MAX   : vec3<f32> = vec3<f32>(64, 32, 64);
+var<private> ABSOLUTE_AIR: vec3<f32> = vec3<f32>(-10000, -10000, -10000);
+var<private> POSITIVE_ABSOLUTE_GRADIENT: vec3<f32> = vec3<f32>(10000, -10000, 10000);
+
 ${SHADER_LIBS['Lib:Noise']}
 
 fn density(position: vec3<f32>) -> vec4<f32> {
-  var value    = 16.0 - position.y;
-  var gradient = vec3<f32>(0, -1, 0);
+  var value    = 16.0 - position.y +
+                 dot(step(position, WORLD_MIN), ABSOLUTE_AIR) +
+                 dot(step(WORLD_MAX, position), ABSOLUTE_AIR);
+
+  var gradient = vec3<f32>(0, -1, 0) +
+                 dot(step(position, WORLD_MIN), -POSITIVE_ABSOLUTE_GRADIENT) +
+                 dot(step(WORLD_MAX, position),  POSITIVE_ABSOLUTE_GRADIENT);
 
   for (var i = 0u; i < NUM_OCTAVES; i++) {
     let sample = snoise(position * octaves[i].yyy * GLOBAL_ANGULAR_VELOCITY);
@@ -776,7 +786,7 @@ async function main() {
 
     const light = new HemisphericLight('light', Vector3.Up(), scene);
 
-    const terrains = Utils.Number.Range(512).map(i => CreateTerrain(scene, `terrain-${i}`, true));
+    const terrains = Utils.Number.Range(512).map(i => CreateTerrain(scene, `terrain-${i}`));
 
     Shaders.MarchingCubesMesh.setStorageBuffer('edge_cases', Buffers.MarchingCubesEdgeCases);
     Shaders.MarchingCubesMesh.setStorageBuffer('triangle_cases', Buffers.MarchingCubesTriangleCases);
