@@ -337,7 +337,7 @@ const Utils = {
 
 const $ENV = {
   world: {
-    center: () => new Vector3(16, 8, 16),
+    center: () => new Vector3(32, 16, 32),
   },
   shaders: {
     marchingCubes: {
@@ -510,11 +510,30 @@ var<private> NUM_VERTICES_IN_CUBE: u32 = 8u;
 var<private> NUM_EDGES_IN_CUBE: u32 = 12u;
 var<private> TRIANGLE_CASE_OFFSET: u32 = 16u;
 
+var<private> GLOBAL_AMPLITUDE: f32 = 4.0;
+var<private> GLOBAL_ANGULAR_VELOCITY: f32 = 0.2;
+var<private> NUM_OCTAVES: u32 = 4u;
+var<private> octaves: array<vec2<f32>, 4> = array<vec2<f32>, 4>(
+  vec2<f32>(1, 1),
+  vec2<f32>(2, 0.5),
+  vec2<f32>(4, 0.25),
+  vec2<f32>(8, 0.125),
+);
+
 ${SHADER_LIBS['Lib:Noise']}
 
 fn density(position: vec3<f32>) -> vec4<f32> {
-  let sample = 8 * snoise(.125 * position);
-  return vec4<f32>(vec3<f32>(0, -1, 0) + sample.xyz, 8.0 - position.y + sample.w);
+  var value    = 16.0 - position.y;
+  var gradient = vec3<f32>(0, -1, 0);
+
+  for (var i = 0u; i < NUM_OCTAVES; i++) {
+    let sample = snoise(position * octaves[i].yyy * GLOBAL_ANGULAR_VELOCITY);
+
+    value    += sample.w * octaves[i].x * GLOBAL_AMPLITUDE;
+    gradient += sample.xyz * octaves[i].yyy * GLOBAL_ANGULAR_VELOCITY * octaves[i].x * GLOBAL_AMPLITUDE;
+  }
+
+  return vec4<f32>(gradient, value);
 }
 
 @compute @workgroup_size(${$ENV.shaders.marchingCubes.workgroupSize.x}, ${$ENV.shaders.marchingCubes.workgroupSize.y}, ${$ENV.shaders.marchingCubes.workgroupSize.z})
@@ -757,7 +776,7 @@ async function main() {
 
     const light = new HemisphericLight('light', Vector3.Up(), scene);
 
-    const terrains = Utils.Number.Range(64).map(i => CreateTerrain(scene, `terrain-${i}`));
+    const terrains = Utils.Number.Range(512).map(i => CreateTerrain(scene, `terrain-${i}`, true));
 
     Shaders.MarchingCubesMesh.setStorageBuffer('edge_cases', Buffers.MarchingCubesEdgeCases);
     Shaders.MarchingCubesMesh.setStorageBuffer('triangle_cases', Buffers.MarchingCubesTriangleCases);
@@ -768,9 +787,9 @@ async function main() {
         () => UpdateTerrain(
           terrain,
           new Vector3(
-            (Math.floor(i / 16) % 4) * $ENV.shaders.marchingCubes.computeShaderGrid.x,
-            (Math.floor(i / 4) % 4) * $ENV.shaders.marchingCubes.computeShaderGrid.y,
-            (i % 4) * $ENV.shaders.marchingCubes.computeShaderGrid.z,
+            (Math.floor(i / 64) % 8) * $ENV.shaders.marchingCubes.computeShaderGrid.x,
+            (Math.floor(i / 8) % 8) * $ENV.shaders.marchingCubes.computeShaderGrid.y,
+            (i % 8) * $ENV.shaders.marchingCubes.computeShaderGrid.z,
           ),
       )),
     );
