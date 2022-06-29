@@ -520,6 +520,7 @@ var<private> octaves: array<vec2<f32>, 4> = array<vec2<f32>, 4>(
   vec2<f32>(8, 0.125),
 );
 
+var<private> SEED_POS    : vec3<f32> = vec3<f32>(23, 37, 69);
 var<private> WORLD_MIN   : vec3<f32> = vec3<f32>(0, 0, 0);
 var<private> WORLD_MAX   : vec3<f32> = vec3<f32>(64, 32, 64);
 var<private> ABSOLUTE_AIR: vec3<f32> = vec3<f32>(-10000, -10000, -10000);
@@ -528,7 +529,7 @@ var<private> POSITIVE_ABSOLUTE_GRADIENT: vec3<f32> = vec3<f32>(10000, -10000, 10
 ${SHADER_LIBS['Lib:Noise']}
 
 fn density(position: vec3<f32>) -> vec4<f32> {
-  var value    = 16.0 - position.y +
+  var value    = 12.0 - position.y +
                  dot(step(position, WORLD_MIN), ABSOLUTE_AIR) +
                  dot(step(WORLD_MAX, position), ABSOLUTE_AIR);
 
@@ -536,8 +537,10 @@ fn density(position: vec3<f32>) -> vec4<f32> {
                  dot(step(position, WORLD_MIN), -POSITIVE_ABSOLUTE_GRADIENT) +
                  dot(step(WORLD_MAX, position),  POSITIVE_ABSOLUTE_GRADIENT);
 
+  let sampled_position = position + SEED_POS;
+
   for (var i = 0u; i < NUM_OCTAVES; i++) {
-    let sample = snoise(position * octaves[i].yyy * GLOBAL_ANGULAR_VELOCITY);
+    let sample = snoise(sampled_position * octaves[i].yyy * GLOBAL_ANGULAR_VELOCITY);
 
     value    += sample.w * octaves[i].x * GLOBAL_AMPLITUDE;
     gradient += sample.xyz * octaves[i].yyy * GLOBAL_ANGULAR_VELOCITY * octaves[i].x * GLOBAL_AMPLITUDE;
