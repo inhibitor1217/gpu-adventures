@@ -1,15 +1,17 @@
 /// <reference path="../../node_modules/babylonjs/babylon.d.ts" />
 
 const {
-  ArcRotateCamera,
+  ActionManager,
   BoundingInfo,
   Buffer,
   Color3,
   ComputeShader,
+  ExecuteCodeAction,
   HemisphericLight,
   Mesh,
   MeshBuilder,
   RawTexture,
+  Scalar,
   Scene,
   ShaderLanguage,
   ShaderMaterial,
@@ -18,7 +20,9 @@ const {
   StorageBuffer,
   Texture,
   TextureSampler,
+  TransformNode,
   UniformBuffer,
+  UniversalCamera,
   Vector3,
   VertexBuffer,
   VertexData,
@@ -340,6 +344,12 @@ const Utils = {
 const $ENV = {
   world: {
     center: () => new Vector3(32, 16, 32),
+  },
+  player: {
+    speed: {
+      forward: 6,
+      rotation: 1.2,
+    },
   },
   shaders: {
     marchingCubes: {
@@ -844,10 +854,80 @@ async function main() {
     return { tex, samp };
   }
 
+  /**
+   * @param {BABYLON.Scene} scene
+   * @returns {{
+   *  character: BABYLON.Mesh
+   *  camera: BABYLON.ArcRotateCamera
+   * }}
+   */
+  function CreatePlayer(scene) {
+    const player = MeshBuilder.CreateBox('character', { size: 1 }, scene);
+    player.position = Vector3.Zero();
+    const playerMat = new StandardMaterial('character-mat', scene);
+    playerMat.diffuseColor = Color3.Red();
+    player.material = playerMat;
+    
+    const cameraRoot = new TransformNode('camera-root');
+    const cameraOffset = new Vector3(0, 4, -8);
+    const cameraTarget = new Vector3(0, 0, 4);
+    const camera = new UniversalCamera('camera', Vector3.Zero(), scene);
+    camera.parent = cameraRoot;
+    camera.position = cameraOffset;
+    camera.setTarget(cameraTarget);
+
+    /* Keyboard Controls */
+    const actionManager = new ActionManager(scene);
+    const keyboardInputs = {};
+    const onEvent = event => keyboardInputs[event.sourceEvent.key] = event.sourceEvent.type === 'keydown';
+    actionManager.registerAction(new ExecuteCodeAction(ActionManager.OnKeyDownTrigger, onEvent));
+    actionManager.registerAction(new ExecuteCodeAction(ActionManager.OnKeyUpTrigger, onEvent));
+    scene.actionManager = actionManager;
+
+    const inputs = Vector3.Zero();
+    const updateFromKeyboardInput = () => {
+      const nextInputs = Vector3.Zero();
+      if (keyboardInputs['ArrowUp']) { nextInputs.addInPlace(Vector3.Forward()); }
+      if (keyboardInputs['ArrowLeft']) { nextInputs.addInPlace(Vector3.Left()); }
+      if (keyboardInputs['ArrowRight']) { nextInputs.addInPlace(Vector3.Right()); }
+      if (keyboardInputs['w']) { nextInputs.addInPlace(Vector3.Up()); }
+      if (keyboardInputs['a']) { nextInputs.addInPlace(Vector3.Left()); }
+      if (keyboardInputs['s']) { nextInputs.addInPlace(Vector3.Down()); }
+      if (keyboardInputs['d']) { nextInputs.addInPlace(Vector3.Right()); }
+
+      inputs.copyFrom(Vector3.Lerp(inputs, nextInputs, 0.02));
+    };
+
+    /* Player Controls */
+    const updatePlayer = () => {
+      const deltaTime = engine.getDeltaTime() * 0.001;
+
+      player.rotation.x += (-$ENV.player.speed.rotation * inputs.y - player.rotation.x * .5 * PI) * deltaTime;
+      player.rotation.y += $ENV.player.speed.rotation * deltaTime * inputs.x;
+      
+      player.position.addInPlace(player.forward.scale($ENV.player.speed.forward * deltaTime * inputs.z));
+    };
+
+    const updateCamera = () => {
+      cameraRoot.rotation = player.rotation;
+      cameraRoot.position = Vector3.Lerp(cameraRoot.position, player.position, 0.05);
+    };
+
+    /* Attach pre-render handlers */
+    scene.onBeforeRenderObservable.add(updateFromKeyboardInput);
+    scene.onBeforeRenderObservable.add(updatePlayer);
+    scene.onBeforeRenderObservable.add(updateCamera);
+
+    return {
+      character: player,
+      camera,
+    };
+  }
+
   function createScene() {
     const scene = new Scene(engine);
-    const camera = new ArcRotateCamera('camera', 0.25 * PI, 0.25 * PI, 32, $ENV.world.center(), scene);
-    camera.attachControl(canvas, false);
+
+    const { character, camera } = CreatePlayer(scene);
 
     const light = new HemisphericLight('light', Vector3.Up(), scene);
 
