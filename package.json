@@ -5,7 +5,8 @@
   "private": true,
   "workspaces": [
     "boids",
-    "boids-3d"
+    "boids-3d",
+    "marching-cubes"
   ],
   "devDependencies": {
     "babylonjs": "^5.3.0"
