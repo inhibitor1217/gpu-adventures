@@ -6,7 +6,8 @@
   "workspaces": [
     "boids",
     "boids-3d",
-    "marching-cubes"
+    "marching-cubes",
+    "star"
   ],
   "devDependencies": {
     "babylonjs": "^5.3.0"
