@@ -5,47 +5,19 @@ import {
   Scene,
   ShaderLanguage,
   ShaderMaterial,
-  ShaderStore,
   Vector3,
   WebGPUEngine,
 } from 'babylonjs'
 
+import { loadWGSLShaders } from './shader'
+
 import './style.css'
-
-async function prepareShaders(): Promise<void> {
-  ShaderStore.ShadersStoreWGSL['customVertexShader'] = `
-  #include<sceneUboDeclaration>
-  #include<meshUboDeclaration>
-
-  attribute position: vec3<f32>;
-  attribute normal: vec3<f32>;
-
-  varying vNormal: vec3<f32>;
-
-  @vertex
-  fn main(input: VertexInputs) -> FragmentInputs {
-    vertexOutputs.position = scene.viewProjection * mesh.world * vec4<f32>(vertexInputs.position, 1.0);
-    vertexOutputs.vNormal = normalize((mesh.world * vec4<f32>(vertexInputs.normal, 0.0)).xyz);
-  }
-  `
-
-  ShaderStore.ShadersStoreWGSL['customFragmentShader'] = `
-  varying vNormal: vec3<f32>;
-
-  @fragment
-  fn main(input: FragmentInputs) -> FragmentOutputs {
-    var diffuse: f32 = clamp(dot(fragmentInputs.vNormal, vec3<f32>(0.0, 1.0, 0.0)), 0.0, 1.0);
-    var lightColor: vec3<f32> = vec3<f32>(1.0, 1.0, 1.0);
-    fragmentOutputs.color = vec4<f32>(diffuse * lightColor, 1.0);
-  }
-  `
-}
 
 async function prepare(canvas: HTMLCanvasElement): Promise<WebGPUEngine> {
   const engine = new WebGPUEngine(canvas)
 
   await engine.initAsync()
-  await prepareShaders()
+  await loadWGSLShaders(await import.meta.glob('./material/**/*.wgsl', { as: 'raw' }))
 
   window.addEventListener('resize', () => {
     engine.resize()
