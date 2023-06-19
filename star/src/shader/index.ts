@@ -1,6 +1,7 @@
 import { ShaderStore } from 'babylonjs'
 
 import { debug, warn } from './log'
+import { preprocess } from './preprocess'
 
 const vertexShaderRegExp = /^(?:.*\/)?([\w.]+)\.vert\.wgsl$/
 const fragmentShaderRegExp = /^(?:.*\/)?([\w.]+)\.frag\.wgsl$/
@@ -178,7 +179,8 @@ export async function loadWGSLShaders(
       ])
       .map(({ materialName, shaderType, loadShader }) => (
         loadShader()
-          .then(source => loadToBabylonWGSLShaderStore(materialName, shaderType, source as string))
+          .then(source => preprocess(source as string))
+          .then(source => loadToBabylonWGSLShaderStore(materialName, shaderType, source))
       )),
   )
 
