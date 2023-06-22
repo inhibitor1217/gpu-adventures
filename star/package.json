@@ -13,6 +13,7 @@
     "vite": "^4.3.9"
   },
   "dependencies": {
-    "babylonjs": "^6.8.0"
+    "@babylonjs/core": "^6.8.0",
+    "@inhibitor1217/babylonjs-wgsl": "0.1.0"
   }
 }

@@ -7,9 +7,8 @@ import {
   ShaderMaterial,
   Vector3,
   WebGPUEngine,
-} from 'babylonjs'
-
-import { loadWGSLShaders } from './shader'
+} from '@babylonjs/core'
+import { loadWGSLShaders } from '@inhibitor1217/babylonjs-wgsl'
 
 import './style.css'
 
