@@ -1119,6 +1119,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"random@workspace:random":
+  version: 0.0.0-use.local
+  resolution: "random@workspace:random"
+  dependencies:
+    "@babylonjs/core": ^6.8.0
+    "@inhibitor1217/babylonjs-wgsl": 0.2.0-alpha.2
+    typescript: ^5.0.2
+    vite: ^4.3.9
+  languageName: unknown
+  linkType: soft
+
 "readable-stream@npm:^3.6.0":
   version: 3.6.2
   resolution: "readable-stream@npm:3.6.2"
@@ -1267,17 +1278,6 @@ __metadata:
   checksum: fb14da9f8a72b04eab163eb13a9dda11d5962cd2317f85457c4e0b575e9a6e0e3a6a87b5bf122c75cb36565830cd5f263fb457571bf6f1587eb5f95d095d6165
   languageName: node
   linkType: hard
-
-"star@workspace:star":
-  version: 0.0.0-use.local
-  resolution: "star@workspace:star"
-  dependencies:
-    "@babylonjs/core": ^6.8.0
-    "@inhibitor1217/babylonjs-wgsl": 0.2.0-alpha.2
-    typescript: ^5.0.2
-    vite: ^4.3.9
-  languageName: unknown
-  linkType: soft
 
 "string-width-cjs@npm:string-width@^4.2.0, string-width@npm:^1.0.2 || 2 || 3 || 4, string-width@npm:^4.1.0, string-width@npm:^4.2.3":
   version: 4.2.3

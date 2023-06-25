@@ -7,8 +7,7 @@
     "boids",
     "boids-3d",
     "marching-cubes",
-    "star",
-    "lib/*"
+    "random"
   ],
   "devDependencies": {
     "babylonjs": "^5.3.0"
