@@ -33,14 +33,30 @@ async function prepare(canvas: HTMLCanvasElement): Promise<WebGPUEngine> {
 async function createScene(engine: Engine): Promise<Scene> {
   const scene = new Scene(engine)
 
-  const camera = new ArcRotateCamera('camera', -0.5 * Math.PI, 0.5 * Math.PI, 16, Vector3.Zero(), scene)
+  const camera = new ArcRotateCamera('camera', -0.7 * Math.PI, 0.4 * Math.PI, 16, Vector3.Zero(), scene)
   camera.setTarget(Vector3.Zero())
   camera.attachControl(engine.getRenderingCanvas(), true)
   
   const elapsedTimeUbo = await createElapsedTimeUniformBuffer(engine)
   const randomSeedUbo = await createRandomSeedUniformBuffer(engine)
 
-  const shaderMaterial = new ShaderMaterial(
+  const ikedaCellsMat = new ShaderMaterial(
+    'ikedaCells',
+    scene,
+    {
+      vertex: 'ikedaCells',
+      fragment: 'ikedaCells',
+    },
+    {
+      attributes: ['position', 'normal'],
+      uniformBuffers: ['Scene', 'Mesh'],
+      shaderLanguage: ShaderLanguage.WGSL,
+    },
+  )
+  ikedaCellsMat.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
+  ikedaCellsMat.setUniformBuffer('randomSeed', randomSeedUbo)
+
+  const ikedaStreamMat = new ShaderMaterial(
     'ikedaStream',
     scene,
     {
@@ -53,14 +69,16 @@ async function createScene(engine: Engine): Promise<Scene> {
       shaderLanguage: ShaderLanguage.WGSL,
     },
   )
-  shaderMaterial.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
-  shaderMaterial.setUniformBuffer('randomSeed', randomSeedUbo)
+  ikedaStreamMat.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
+  ikedaStreamMat.setUniformBuffer('randomSeed', randomSeedUbo)
 
-  const quad = MeshBuilder.CreatePlane('quad', { width: 16, height: 8 }, scene)
-  quad.material = shaderMaterial
-  quad.position = Vector3.Zero()
+  const ikedaCellsQuad = MeshBuilder.CreatePlane('quad', { width: 16, height: 2 }, scene)
+  ikedaCellsQuad.material = ikedaCellsMat
+  ikedaCellsQuad.position = new Vector3(0, 0, 0)
 
-  const _axes = new AxesViewer(scene)
+  const ikedaStreamQuad = MeshBuilder.CreatePlane('quad', { width: 16, height: 8 }, scene)
+  ikedaStreamQuad.material = ikedaStreamMat
+  ikedaStreamQuad.position = new Vector3(0, 0, 8)
 
   return scene
 }
