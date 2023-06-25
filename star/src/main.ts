@@ -41,11 +41,11 @@ async function createScene(engine: Engine): Promise<Scene> {
   const randomSeedUbo = await createRandomSeedUniformBuffer(engine)
 
   const shaderMaterial = new ShaderMaterial(
-    'ikedaCells',
+    'ikedaStream',
     scene,
     {
-      vertex: 'ikedaCells',
-      fragment: 'ikedaCells',
+      vertex: 'ikedaStream',
+      fragment: 'ikedaStream',
     },
     {
       attributes: ['position', 'normal'],
@@ -56,7 +56,7 @@ async function createScene(engine: Engine): Promise<Scene> {
   shaderMaterial.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
   shaderMaterial.setUniformBuffer('randomSeed', randomSeedUbo)
 
-  const quad = MeshBuilder.CreatePlane('quad', { width: 16, height: 2 }, scene)
+  const quad = MeshBuilder.CreatePlane('quad', { width: 16, height: 8 }, scene)
   quad.material = shaderMaterial
   quad.position = Vector3.Zero()
 
