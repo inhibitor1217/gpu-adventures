@@ -33,7 +33,7 @@ async function prepare(canvas: HTMLCanvasElement): Promise<WebGPUEngine> {
 async function createScene(engine: Engine): Promise<Scene> {
   const scene = new Scene(engine)
 
-  const camera = new ArcRotateCamera('camera', 0.25 * Math.PI, 0.25 * Math.PI, 16, Vector3.Zero(), scene)
+  const camera = new ArcRotateCamera('camera', -0.5 * Math.PI, 0.5 * Math.PI, 16, Vector3.Zero(), scene)
   camera.setTarget(Vector3.Zero())
   camera.attachControl(engine.getRenderingCanvas(), true)
   
@@ -41,11 +41,11 @@ async function createScene(engine: Engine): Promise<Scene> {
   const randomSeedUbo = await createRandomSeedUniformBuffer(engine)
 
   const shaderMaterial = new ShaderMaterial(
-    'custom',
+    'ikedaCells',
     scene,
     {
-      vertex: 'custom',
-      fragment: 'custom',
+      vertex: 'ikedaCells',
+      fragment: 'ikedaCells',
     },
     {
       attributes: ['position', 'normal'],
@@ -56,9 +56,9 @@ async function createScene(engine: Engine): Promise<Scene> {
   shaderMaterial.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
   shaderMaterial.setUniformBuffer('randomSeed', randomSeedUbo)
 
-  const sphere = MeshBuilder.CreateSphere('sphere', { diameter: 10 }, scene)
-  sphere.material = shaderMaterial
-  sphere.position = Vector3.Zero()
+  const quad = MeshBuilder.CreatePlane('quad', { width: 16, height: 2 }, scene)
+  quad.material = shaderMaterial
+  quad.position = Vector3.Zero()
 
   const _axes = new AxesViewer(scene)
 
