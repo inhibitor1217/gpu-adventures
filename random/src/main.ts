@@ -1,6 +1,5 @@
 import {
   ArcRotateCamera,
-  AxesViewer,
   Engine,
   MeshBuilder,
   Scene,
