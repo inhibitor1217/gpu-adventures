@@ -1,6 +1,6 @@
 # Random
 
-> ### Watch the [Simulation](https://inhibitor1217.github.io/gpu-adventures/random/) 🚀
+> ### Watch the [Simulation](https://inhibitor1217.github.io/gpu-adventures/random-dist/) 🚀
 
 Examples from [The Book of Shaders](https://thebookofshaders.com/10/), but written shaders in WGSL and own implementations.
 
