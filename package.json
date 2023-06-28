@@ -7,6 +7,7 @@
     "boids",
     "boids-3d",
     "marching-cubes",
+    "noise",
     "random"
   ],
   "devDependencies": {

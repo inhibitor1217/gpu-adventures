@@ -12,6 +12,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@babylonjs/core@npm:^6.9.0":
+  version: 6.9.0
+  resolution: "@babylonjs/core@npm:6.9.0"
+  checksum: d5c6b29be939b1fd82638b10974f38aadb62fb1fb78e007e7b9a6471faf60ab8f1584d83d81761a602d021e2554d24dcef8436fee6ab684b339dde46f2d42614
+  languageName: node
+  linkType: hard
+
 "@esbuild/android-arm64@npm:0.17.19":
   version: 0.17.19
   resolution: "@esbuild/android-arm64@npm:0.17.19"
@@ -1025,6 +1032,17 @@ __metadata:
   checksum: 78b404e2e0639d64e145845f7f5a3cb20c0520cdaf6dda2f6e025e9b644077202ea7de1232396ba5bde3fee84cdc79604feebe6ba3ec84d464c85d407bb5da99
   languageName: node
   linkType: hard
+
+"noise@workspace:noise":
+  version: 0.0.0-use.local
+  resolution: "noise@workspace:noise"
+  dependencies:
+    "@babylonjs/core": ^6.9.0
+    "@inhibitor1217/babylonjs-wgsl": 0.2.0-alpha.2
+    typescript: ^5.0.2
+    vite: ^4.3.9
+  languageName: unknown
+  linkType: soft
 
 "nopt@npm:^6.0.0":
   version: 6.0.0
