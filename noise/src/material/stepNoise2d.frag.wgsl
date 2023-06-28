@@ -13,11 +13,9 @@ fn random3d(pos: vec3<f32>) -> f32 {
   return RANDOM_SINE_FRACT__random__f32_3d(pos, randomSeed);
 }
 
-fn intensity_at(pos: vec2<f32>) -> f32 {
-  let sampledPos = vec3<f32>(pos, elapsedTimeMs) * NOISE_FREQUENCY;
-  
-  let iPos = floor(sampledPos);
-  let fPos = fract(sampledPos);
+fn noise3d(pos: vec3<f32>) -> f32 {
+  let iPos = floor(pos);
+  let fPos = fract(pos);
 
   return MIX__mix_hermite__f32(
     MIX__mix_hermite__f32(
@@ -48,6 +46,10 @@ fn intensity_at(pos: vec2<f32>) -> f32 {
     ),
     fPos.z,
   );
+}
+
+fn intensity_at(pos: vec2<f32>) -> f32 {
+  return noise3d(vec3<f32>(pos, elapsedTimeMs) * NOISE_FREQUENCY);
 }
 
 @fragment
