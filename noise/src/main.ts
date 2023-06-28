@@ -28,6 +28,21 @@ async function prepare(canvas: HTMLCanvasElement): Promise<WebGPUEngine> {
   return engine
 }
 
+async function createElapsedTimeUniformBuffer(engine: Engine): Promise<UniformBuffer> {
+  let elapsedMs = 0
+  const timeUbo = new UniformBuffer(engine)
+  timeUbo.addUniform('elapsedTimeMs', [elapsedMs])
+  timeUbo.update()
+
+  engine.runRenderLoop(() => {
+    elapsedMs += engine.getDeltaTime()
+    timeUbo.updateFloat('elapsedTimeMs', elapsedMs)
+    timeUbo.update()
+  })
+
+  return timeUbo
+}
+
 async function createRandomSeedUniformBuffer(engine: Engine): Promise<UniformBuffer> {
   const randomSeedUbo = new UniformBuffer(engine)
   randomSeedUbo.addUniform('randomSeed', [
@@ -49,6 +64,7 @@ async function createScene(engine: Engine): Promise<Scene> {
   camera.setTarget(Vector3.Zero())
   camera.attachControl(engine.getRenderingCanvas(), true)
 
+  const elapsedTimeUbo = await createElapsedTimeUniformBuffer(engine)
   const randomSeedUbo = await createRandomSeedUniformBuffer(engine)
 
   const stepNoise2dMat = new ShaderMaterial(
@@ -65,6 +81,7 @@ async function createScene(engine: Engine): Promise<Scene> {
     },
   )
 
+  stepNoise2dMat.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
   stepNoise2dMat.setUniformBuffer('randomSeed', randomSeedUbo)
 
   const quad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
