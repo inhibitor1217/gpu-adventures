@@ -7,10 +7,9 @@ varying uv: vec2<f32>;
 const NOISE_FREQUENCY: vec3<f32> = vec3<f32>(8.0, 8.0, 0.001);
 
 var<uniform> elapsedTimeMs: f32;
-var<uniform> randomSeed : RANDOM__RandomSeed;
 
 fn random3d(pos: vec3<f32>) -> f32 {
-  return RANDOM_SINE_FRACT__random__f32_3d(pos, randomSeed);
+  return RANDOM_SINE_FRACT__random__f32_3d(pos);
 }
 
 fn noise3d(pos: vec3<f32>) -> f32 {

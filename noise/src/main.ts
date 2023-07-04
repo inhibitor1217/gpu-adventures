@@ -43,20 +43,6 @@ async function createElapsedTimeUniformBuffer(engine: Engine): Promise<UniformBu
   return timeUbo
 }
 
-async function createRandomSeedUniformBuffer(engine: Engine): Promise<UniformBuffer> {
-  const randomSeedUbo = new UniformBuffer(engine)
-  randomSeedUbo.addUniform('randomSeed', [
-    12.9898,
-    78.233,
-    37.719,
-    63.137,
-    43758.5453,
-  ])
-  randomSeedUbo.update()
-
-  return randomSeedUbo
-}
-
 async function createScene(engine: Engine): Promise<Scene> {
   const scene = new Scene(engine)
   
@@ -65,7 +51,6 @@ async function createScene(engine: Engine): Promise<Scene> {
   camera.attachControl(engine.getRenderingCanvas(), true)
 
   const elapsedTimeUbo = await createElapsedTimeUniformBuffer(engine)
-  const randomSeedUbo = await createRandomSeedUniformBuffer(engine)
 
   const stepNoise2dMat = new ShaderMaterial(
     'stepNoise2d',
@@ -82,7 +67,6 @@ async function createScene(engine: Engine): Promise<Scene> {
   )
 
   stepNoise2dMat.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
-  stepNoise2dMat.setUniformBuffer('randomSeed', randomSeedUbo)
 
   const quad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
   quad.position = Vector3.Zero()
