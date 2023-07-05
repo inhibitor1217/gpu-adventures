@@ -1,7 +1,6 @@
 import {
   ArcRotateCamera,
   Engine,
-  Material,
   MeshBuilder,
   Scene,
   ShaderLanguage,
@@ -44,37 +43,19 @@ async function createElapsedTimeUniformBuffer(engine: Engine): Promise<UniformBu
   return timeUbo
 }
 
-async function createStepNoiseMaterial(engine: Engine, scene: Scene): Promise<Material> {
+async function createShaderMaterial(
+  engine: Engine,
+  scene: Scene,
+  shader: string
+): Promise<ShaderMaterial> {
   const elapsedTimeUbo = await createElapsedTimeUniformBuffer(engine)
 
   const material = new ShaderMaterial(
     'stepNoise2d',
     scene,
     {
-      vertex: 'stepNoise2d',
-      fragment: 'stepNoise2d',
-    },
-    {
-      attributes: ['position', 'normal', 'uv'],
-      uniformBuffers: ['Scene', 'Mesh'],
-      shaderLanguage: ShaderLanguage.WGSL,
-    },
-  )
-
-  material.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
-
-  return material
-}
-
-async function createGradientNoiseMaterial(engine: Engine, scene: Scene): Promise<Material> {
-  const elapsedTimeUbo = await createElapsedTimeUniformBuffer(engine)
-
-  const material = new ShaderMaterial(
-    'gradientNoise2d',
-    scene,
-    {
-      vertex: 'gradientNoise2d',
-      fragment: 'gradientNoise2d',
+      vertex: shader,
+      fragment: shader,
     },
     {
       attributes: ['position', 'normal', 'uv'],
@@ -95,16 +76,21 @@ async function createScene(engine: Engine): Promise<Scene> {
   camera.setTarget(Vector3.Zero())
   camera.attachControl(engine.getRenderingCanvas(), true)
 
-  const stepNoiseMat = await createStepNoiseMaterial(engine, scene)
-  const gradientNoiseMat = await createGradientNoiseMaterial(engine, scene)
+  const stepNoiseMat = await createShaderMaterial(engine, scene, 'stepNoise2d')
+  const gradientNoiseMat = await createShaderMaterial(engine, scene, 'gradientNoise2d')
+  const swirlyLinesMat = await createShaderMaterial(engine, scene, 'swirlyLines')
 
   const stepNoiseQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
-  stepNoiseQuad.position = new Vector3(-1.2, 0, 0)
+  stepNoiseQuad.position = new Vector3(-2.2, 0, 0)
   stepNoiseQuad.material = stepNoiseMat
 
   const gradientNoiseQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
-  gradientNoiseQuad.position = new Vector3(1.2, 0, 0)
+  gradientNoiseQuad.position = new Vector3(2.2, 0, 0)
   gradientNoiseQuad.material = gradientNoiseMat
+
+  const swirlyLinesQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
+  swirlyLinesQuad.position = new Vector3(0, 0, 0)
+  swirlyLinesQuad.material = swirlyLinesMat
 
   return scene
 }
