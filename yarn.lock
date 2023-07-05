@@ -194,12 +194,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.6":
-  version: 0.2.0-alpha.6
-  resolution: "@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.6::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40inhibitor1217%2Fbabylonjs-wgsl%2F0.2.0-alpha.6%2Fda3c0d384640537eb4bcee272aa9023c9045ddd6"
+"@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.8":
+  version: 0.2.0-alpha.8
+  resolution: "@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.8::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40inhibitor1217%2Fbabylonjs-wgsl%2F0.2.0-alpha.8%2Fdb2fb6b171c865b1425967f252db9937dcb3080b"
   peerDependencies:
     "@babylonjs/core": ^5.0.0 || ^6.0.0
-  checksum: 310ec295e6e0e16ea1d9ed4a76add37a2955deac7afb90929262357c48431a1da06aed86e1a0e7bcfd731d004e1f5f31766d8b05e20faeac12169adc2a743987
+  checksum: 47bfd38720c44752fd7dd7fe1c21f7249866ed5afa3ba0045027ab066d166baa8bfa37af26065b99325555cffced0642f9acfd242fd35cc15a334c4471dd46a1
   languageName: node
   linkType: hard
 
@@ -1047,7 +1047,7 @@ __metadata:
   resolution: "noise@workspace:noise"
   dependencies:
     "@babylonjs/core": ^6.9.0
-    "@inhibitor1217/babylonjs-wgsl": 0.2.0-alpha.6
+    "@inhibitor1217/babylonjs-wgsl": 0.2.0-alpha.8
     typescript: ^5.0.2
     vite: ^4.3.9
   languageName: unknown

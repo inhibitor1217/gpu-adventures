@@ -1,6 +1,7 @@
 import {
   ArcRotateCamera,
   Engine,
+  Material,
   MeshBuilder,
   Scene,
   ShaderLanguage,
@@ -43,16 +44,10 @@ async function createElapsedTimeUniformBuffer(engine: Engine): Promise<UniformBu
   return timeUbo
 }
 
-async function createScene(engine: Engine): Promise<Scene> {
-  const scene = new Scene(engine)
-  
-  const camera = new ArcRotateCamera('camera', -0.5 * Math.PI, 0.5 * Math.PI, 4, Vector3.Zero(), scene)
-  camera.setTarget(Vector3.Zero())
-  camera.attachControl(engine.getRenderingCanvas(), true)
-
+async function createStepNoiseMaterial(engine: Engine, scene: Scene): Promise<Material> {
   const elapsedTimeUbo = await createElapsedTimeUniformBuffer(engine)
 
-  const stepNoise2dMat = new ShaderMaterial(
+  const material = new ShaderMaterial(
     'stepNoise2d',
     scene,
     {
@@ -66,11 +61,50 @@ async function createScene(engine: Engine): Promise<Scene> {
     },
   )
 
-  stepNoise2dMat.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
+  material.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
 
-  const quad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
-  quad.position = Vector3.Zero()
-  quad.material = stepNoise2dMat
+  return material
+}
+
+async function createGradientNoiseMaterial(engine: Engine, scene: Scene): Promise<Material> {
+  const elapsedTimeUbo = await createElapsedTimeUniformBuffer(engine)
+
+  const material = new ShaderMaterial(
+    'gradientNoise2d',
+    scene,
+    {
+      vertex: 'gradientNoise2d',
+      fragment: 'gradientNoise2d',
+    },
+    {
+      attributes: ['position', 'normal', 'uv'],
+      uniformBuffers: ['Scene', 'Mesh'],
+      shaderLanguage: ShaderLanguage.WGSL,
+    },
+  )
+
+  material.setUniformBuffer('elapsedTimeMs', elapsedTimeUbo)
+
+  return material
+}
+
+async function createScene(engine: Engine): Promise<Scene> {
+  const scene = new Scene(engine)
+  
+  const camera = new ArcRotateCamera('camera', -0.5 * Math.PI, 0.5 * Math.PI, 5, Vector3.Zero(), scene)
+  camera.setTarget(Vector3.Zero())
+  camera.attachControl(engine.getRenderingCanvas(), true)
+
+  const stepNoiseMat = await createStepNoiseMaterial(engine, scene)
+  const gradientNoiseMat = await createGradientNoiseMaterial(engine, scene)
+
+  const stepNoiseQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
+  stepNoiseQuad.position = new Vector3(-1.2, 0, 0)
+  stepNoiseQuad.material = stepNoiseMat
+
+  const gradientNoiseQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
+  gradientNoiseQuad.position = new Vector3(1.2, 0, 0)
+  gradientNoiseQuad.material = gradientNoiseMat
 
   return scene
 }
