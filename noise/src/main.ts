@@ -72,12 +72,13 @@ async function createShaderMaterial(
 async function createScene(engine: Engine): Promise<Scene> {
   const scene = new Scene(engine)
   
-  const camera = new ArcRotateCamera('camera', -0.5 * Math.PI, 0.5 * Math.PI, 5, Vector3.Zero(), scene)
+  const camera = new ArcRotateCamera('camera', -0.5 * Math.PI, 0.5 * Math.PI, 8, Vector3.Zero(), scene)
   camera.setTarget(Vector3.Zero())
   camera.attachControl(engine.getRenderingCanvas(), true)
 
   const stepNoiseMat = await createShaderMaterial(engine, scene, 'stepNoise2d')
   const gradientNoiseMat = await createShaderMaterial(engine, scene, 'gradientNoise2d')
+  const simplexNoiseMat = await createShaderMaterial(engine, scene, 'simplexNoise2d')
   const swirlyLinesMat = await createShaderMaterial(engine, scene, 'swirlyLines')
   const splatterMat = await createShaderMaterial(engine, scene, 'splatter')
 
@@ -88,6 +89,10 @@ async function createScene(engine: Engine): Promise<Scene> {
   const gradientNoiseQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
   gradientNoiseQuad.position = new Vector3(1.1, -1.1, 0)
   gradientNoiseQuad.material = gradientNoiseMat
+
+  const simplexNoiseQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
+  simplexNoiseQuad.position = new Vector3(3.3, -1.1, 0)
+  simplexNoiseQuad.material = simplexNoiseMat
 
   const swirlyLinesQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
   swirlyLinesQuad.position = new Vector3(-1.1, 1.1, 0)
