@@ -14,6 +14,6 @@
   },
   "dependencies": {
     "@babylonjs/core": "^6.9.0",
-    "@inhibitor1217/babylonjs-wgsl": "0.2.0-alpha.12"
+    "@inhibitor1217/babylonjs-wgsl": "0.2.0-alpha.16"
   }
 }
