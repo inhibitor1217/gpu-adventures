@@ -1,7 +1,5 @@
 #include <color>
-#include <mix>
-#include <random/sine_fract>
-#include <random/sine_fract_linker>
+#include <noise/value>
 
 varying uv: vec2<f32>;
 
@@ -9,47 +7,8 @@ const NOISE_FREQUENCY: vec3<f32> = vec3<f32>(32.0, 32.0, 0.001);
 
 var<uniform> elapsedTimeMs: f32;
 
-fn randomValue(pos: vec3<f32>) -> f32 {
-  return RANDOM__random__f32_3d(pos);
-}
-
-fn noise3d(pos: vec3<f32>) -> f32 {
-  let iPos = floor(pos);
-  let fPos = fract(pos);
-
-  return MIX__mix_hermite__f32(
-    MIX__mix_hermite__f32(
-      MIX__mix_hermite__f32(
-        randomValue(iPos + vec3<f32>(0.0, 0.0, 0.0)),
-        randomValue(iPos + vec3<f32>(1.0, 0.0, 0.0)),
-        fPos.x,
-      ),
-      MIX__mix_hermite__f32(
-        randomValue(iPos + vec3<f32>(0.0, 1.0, 0.0)),
-        randomValue(iPos + vec3<f32>(1.0, 1.0, 0.0)),
-        fPos.x,
-      ),
-      fPos.y,
-    ),
-    MIX__mix_hermite__f32(
-      MIX__mix_hermite__f32(
-        randomValue(iPos + vec3<f32>(0.0, 0.0, 1.0)),
-        randomValue(iPos + vec3<f32>(1.0, 0.0, 1.0)),
-        fPos.x,
-      ),
-      MIX__mix_hermite__f32(
-        randomValue(iPos + vec3<f32>(0.0, 1.0, 1.0)),
-        randomValue(iPos + vec3<f32>(1.0, 1.0, 1.0)),
-        fPos.x,
-      ),
-      fPos.y,
-    ),
-    fPos.z,
-  );
-}
-
 fn intensity_at(pos: vec2<f32>) -> f32 {
-  return noise3d(vec3<f32>(pos, elapsedTimeMs) * NOISE_FREQUENCY);
+  return NOISE_VALUE__noise3d__f32(vec3<f32>(pos, elapsedTimeMs) * NOISE_FREQUENCY);
 }
 
 @fragment

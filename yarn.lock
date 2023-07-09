@@ -185,21 +185,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.11":
+  version: 0.2.0-alpha.11
+  resolution: "@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.11::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40inhibitor1217%2Fbabylonjs-wgsl%2F0.2.0-alpha.11%2F4eedf0f9e28cc8290e26e81377bf9a99219b4a13"
+  peerDependencies:
+    "@babylonjs/core": ^5.0.0 || ^6.0.0
+  checksum: 368b3b12cebb38a80d5a35a9fee5197fe91b4608ed6780f2e15a3bb4bb05b44128338b63079b824df910a17a2276934a4fb6c3a4d6a2afb3735d5e019aa0e712
+  languageName: node
+  linkType: hard
+
 "@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.2":
   version: 0.2.0-alpha.2
   resolution: "@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.2::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40inhibitor1217%2Fbabylonjs-wgsl%2F0.2.0-alpha.2%2F4d63ea571ad9351e1f3292be99b4d93d26abdada"
   peerDependencies:
     "@babylonjs/core": ^5.0.0 || ^6.0.0
   checksum: 655419293f4247d01accba1e8afabe93adc23ee38ad2591deed40c69168f78b9ff91ffd2418004e819657e9cfa66ecb8eef25be2a9a129f785868d460f89a68a
-  languageName: node
-  linkType: hard
-
-"@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.8":
-  version: 0.2.0-alpha.8
-  resolution: "@inhibitor1217/babylonjs-wgsl@npm:0.2.0-alpha.8::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40inhibitor1217%2Fbabylonjs-wgsl%2F0.2.0-alpha.8%2Fdb2fb6b171c865b1425967f252db9937dcb3080b"
-  peerDependencies:
-    "@babylonjs/core": ^5.0.0 || ^6.0.0
-  checksum: 47bfd38720c44752fd7dd7fe1c21f7249866ed5afa3ba0045027ab066d166baa8bfa37af26065b99325555cffced0642f9acfd242fd35cc15a334c4471dd46a1
   languageName: node
   linkType: hard
 
@@ -1047,7 +1047,7 @@ __metadata:
   resolution: "noise@workspace:noise"
   dependencies:
     "@babylonjs/core": ^6.9.0
-    "@inhibitor1217/babylonjs-wgsl": 0.2.0-alpha.8
+    "@inhibitor1217/babylonjs-wgsl": 0.2.0-alpha.11
     typescript: ^5.0.2
     vite: ^4.3.9
   languageName: unknown
