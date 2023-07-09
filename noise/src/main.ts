@@ -79,18 +79,23 @@ async function createScene(engine: Engine): Promise<Scene> {
   const stepNoiseMat = await createShaderMaterial(engine, scene, 'stepNoise2d')
   const gradientNoiseMat = await createShaderMaterial(engine, scene, 'gradientNoise2d')
   const swirlyLinesMat = await createShaderMaterial(engine, scene, 'swirlyLines')
+  const splatterMat = await createShaderMaterial(engine, scene, 'splatter')
 
   const stepNoiseQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
-  stepNoiseQuad.position = new Vector3(-2.2, 0, 0)
+  stepNoiseQuad.position = new Vector3(-1.1, -1.1, 0)
   stepNoiseQuad.material = stepNoiseMat
 
   const gradientNoiseQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
-  gradientNoiseQuad.position = new Vector3(2.2, 0, 0)
+  gradientNoiseQuad.position = new Vector3(1.1, -1.1, 0)
   gradientNoiseQuad.material = gradientNoiseMat
 
   const swirlyLinesQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
-  swirlyLinesQuad.position = new Vector3(0, 0, 0)
+  swirlyLinesQuad.position = new Vector3(-1.1, 1.1, 0)
   swirlyLinesQuad.material = swirlyLinesMat
+
+  const splatterQuad = MeshBuilder.CreatePlane('quad', { size: 2 }, scene)
+  splatterQuad.position = new Vector3(1.1, 1.1, 0)
+  splatterQuad.material = splatterMat
 
   return scene
 }
