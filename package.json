@@ -6,6 +6,7 @@
   "workspaces": [
     "boids",
     "boids-3d",
+    "cellular-noise",
     "marching-cubes",
     "noise",
     "random"
